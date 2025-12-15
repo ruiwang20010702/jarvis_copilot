@@ -233,8 +233,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
 
 
                 <div className={`w-full max-w-4xl transition-all ${phase4Step === 'exitpass' && exitPassStep === 'check'
-                        ? 'scale-100 opacity-100'
-                        : 'scale-75 origin-center opacity-90'
+                    ? 'scale-100 opacity-100'
+                    : 'scale-75 origin-center opacity-90'
                     }`}>
                     <AnimatePresence mode="wait">
                         {phase4Step === 'flashcards' && currentCard ? (
@@ -256,7 +256,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                             <div
                                                 key={idx}
                                                 className={`w-2 h-2 rounded-full transition-all ${idx < teachingStep ? 'bg-[#00B4EE]' :
-                                                        idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
+                                                    idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
                                                     }`}
                                             />
                                         ))}
@@ -291,8 +291,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                 </div>
                                             ) : recordingScore !== null && (
                                                 <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
-                                                        ? 'bg-emerald-50 border-2 border-emerald-200'
-                                                        : 'bg-amber-50 border-2 border-amber-200'
+                                                    ? 'bg-emerald-50 border-2 border-emerald-200'
+                                                    : 'bg-amber-50 border-2 border-amber-200'
                                                     }`}>
                                                     {recordingScore >= 80 ? (
                                                         <>
@@ -331,8 +331,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                             <div
                                                 key={item.word}
                                                 className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isMastered
-                                                        ? 'bg-emerald-50 border-emerald-100'
-                                                        : 'bg-white border-slate-100'
+                                                    ? 'bg-emerald-50 border-emerald-100'
+                                                    : 'bg-white border-slate-100'
                                                     }`}
                                             >
                                                 <div className="flex-1">
@@ -346,8 +346,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                 <div
                                                     onClick={() => toggleVocabCheck(item.word)}
                                                     className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isMastered
-                                                            ? 'bg-emerald-500 border-emerald-500 cursor-pointer'
-                                                            : 'bg-white border-slate-300 cursor-pointer hover:border-emerald-400'
+                                                        ? 'bg-emerald-500 border-emerald-500 cursor-pointer'
+                                                        : 'bg-white border-slate-300 cursor-pointer hover:border-emerald-400'
                                                         }`}
                                                 >
                                                     {isMastered && <Check size={16} className="text-white" strokeWidth={3} />}
@@ -381,7 +381,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                 <div
                                                     key={idx}
                                                     className={`w-2 h-2 rounded-full transition-all ${idx < teachingStep ? 'bg-[#00B4EE]' :
-                                                            idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
+                                                        idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
                                                         }`}
                                                 />
                                             ))}
@@ -417,8 +417,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                     </div>
                                                 ) : recordingScore !== null && (
                                                     <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
-                                                            ? 'bg-emerald-50 border-2 border-emerald-200'
-                                                            : 'bg-amber-50 border-2 border-amber-200'
+                                                        ? 'bg-emerald-50 border-2 border-emerald-200'
+                                                        : 'bg-amber-50 border-2 border-amber-200'
                                                         }`}>
                                                         {recordingScore >= 80 ? (
                                                             <>
@@ -493,8 +493,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('next') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`flex-1 py-3 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('next')
-                                            ? 'bg-[#00B4EE]'
-                                            : 'bg-blue-500 hover:bg-blue-600'
+                                        ? 'bg-[#00B4EE]'
+                                        : 'bg-blue-500 hover:bg-blue-600'
                                         }`}
                                 >
                                     <span>下一个</span>
@@ -514,8 +514,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('flip') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('flip')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 hover:bg-slate-200'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 hover:bg-slate-200'
                                         }`}
                                 >
                                     <RotateCw size={14} />
@@ -532,8 +532,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('play') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('play')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 hover:bg-slate-200'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 hover:bg-slate-200'
                                         }`}
                                 >
                                     <Volume2 size={14} />
@@ -550,8 +550,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('syllable') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('syllable')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 hover:bg-slate-200'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 hover:bg-slate-200'
                                         }`}
                                 >
                                     <Eye size={14} />
@@ -569,10 +569,10 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('speak') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('speak')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : isRecording
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-slate-100 hover:bg-slate-200'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : isRecording
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-slate-100 hover:bg-slate-200'
                                         }`}
                                 >
                                     <Mic size={14} />
@@ -607,9 +607,9 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     {/* 阶段指示器 */}
                                     <div className="ml-auto flex items-center gap-1">
                                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${currentScript?.phase === 'E' ? 'bg-blue-100 text-blue-700' :
-                                                currentScript?.phase === 'C' ? 'bg-green-100 text-green-700' :
-                                                    currentScript?.phase === 'O' ? 'bg-amber-100 text-amber-700' :
-                                                        'bg-emerald-100 text-emerald-700'
+                                            currentScript?.phase === 'C' ? 'bg-green-100 text-green-700' :
+                                                currentScript?.phase === 'O' ? 'bg-amber-100 text-amber-700' :
+                                                    'bg-emerald-100 text-emerald-700'
                                             }`}>
                                             {currentScript?.phase}
                                         </span>
@@ -734,8 +734,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('flip') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('flip')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 text-slate-700'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 text-slate-700'
                                         }`}
                                 >
                                     <FlipVertical size={14} />
@@ -752,8 +752,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('syllable') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('syllable')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 text-slate-700'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 text-slate-700'
                                         }`}
                                 >
                                     <Type size={14} />
@@ -770,8 +770,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('play') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('play')
-                                            ? 'bg-[#00B4EE] text-white'
-                                            : 'bg-slate-100 text-slate-700'
+                                        ? 'bg-[#00B4EE] text-white'
+                                        : 'bg-slate-100 text-slate-700'
                                         }`}
                                 >
                                     <Volume2 size={14} />
@@ -789,10 +789,10 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     }}
                                     transition={shouldPulse('readAloud') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${isRecording
+                                        ? 'bg-red-500 text-white'
+                                        : shouldPulse('readAloud')
                                             ? 'bg-red-500 text-white'
-                                            : shouldPulse('readAloud')
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-slate-100 text-slate-700'
+                                            : 'bg-slate-100 text-slate-700'
                                         }`}
                                 >
                                     <Mic size={14} />
@@ -818,11 +818,11 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
                                 <div className="flex-1 bg-white/80 rounded-xl p-4 overflow-y-auto">
                                     <div className="mb-3">
-                                        <p className="text-xs font-bold text-orange-700 mb-1">{currentScript?.title || '回炉学习'}</p>
-                                        <p className="text-slate-700 text-sm leading-relaxed">{currentScript?.content || '请按照 C-E-O 流程引导学生复习这个单词。'}</p>
+                                        <p className="text-xs font-bold text-orange-700 mb-1">{currentScript?.jarvisTitle || '回炉学习'}</p>
+                                        <p className="text-slate-700 text-sm leading-relaxed">{currentScript?.jarvisContent || '请按照 C-E-O 流程引导学生复习这个单词。'}</p>
                                     </div>
                                     <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
-                                        ⏭ 下一步: {currentScript?.nextAction || '继续教学'}
+                                        ⏭ 下一步: {currentScript?.jarvisAction || '继续教学'}
                                     </div>
                                 </div>
                             </motion.div>

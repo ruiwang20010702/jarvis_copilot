@@ -46,6 +46,7 @@ export interface VocabItem {
   contextSentence: string;
   mnemonic: string;
   audioSrc: string;
+  phonetic?: string;
 }
 
 export type VocabStep = 'flashcards' | 'exitpass';
