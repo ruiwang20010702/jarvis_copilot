@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { fetchVersion, lookupWord } from './src/services/apiService';
+import { transformVersion, transformLookupResult } from './src/services/dataTransform';
 
 export type UserRole = 'student' | 'coach' | null;
 
@@ -148,6 +150,11 @@ interface GameStore {
   removeHighlight: (id: string) => void;
   setQuizAnswer: (qId: number, oId: string, isUnsure: boolean) => void;
   setScrollProgress: (progress: number) => void;
+
+  // Data Loading Actions
+  isLoading: boolean;
+  loadVersion: (articleId: number, level: string) => Promise<void>;
+  loadVocabFromLookups: () => Promise<void>;
 
   // Coaching Actions
   setFocusParagraph: (index: number | null) => void;
@@ -439,6 +446,63 @@ export const useGameStore = create<GameStore>((set, get) => ({
   }),
   setScrollProgress: (p) => set({ scrollProgress: p }),
 
+  // Data Loading Actions
+  isLoading: false,
+
+  loadVersion: async (articleId: number, level: string) => {
+    set({ isLoading: true });
+    try {
+      const apiVersion = await fetchVersion(articleId, level);
+      const articleData = transformVersion(apiVersion);
+      set({ articleData, isLoading: false });
+      console.log('[Store] Loaded version:', articleId, level, articleData);
+    } catch (error) {
+      console.error('[Store] Failed to load version:', error);
+      set({ isLoading: false });
+    }
+  },
+
+  loadVocabFromLookups: async () => {
+    const lookups = get().lookups;
+    if (lookups.length === 0) {
+      console.log('[Store] No lookups to load vocab from');
+      return;
+    }
+
+    set({ isLoading: true });
+    const vocabItems: VocabItem[] = [];
+    const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
+
+    for (const word of lookups) {
+      try {
+        const result = await lookupWord(word);
+        vocabItems.push(transformLookupResult(result));
+        vocabStatus[word] = 'unseen';
+      } catch (error) {
+        console.error('[Store] Failed to lookup word:', word, error);
+        // Fallback to basic vocab item
+        vocabItems.push({
+          word,
+          syllables: [word],
+          definition: `Definition for '${word}' not available`,
+          contextSentence: '',
+          mnemonic: '',
+          audioSrc: '',
+        });
+        vocabStatus[word] = 'unseen';
+      }
+    }
+
+    set({
+      vocabList: vocabItems,
+      vocabStatus,
+      currentVocabIndex: 0,
+      phase4Step: 'flashcards',
+      isLoading: false,
+    });
+    console.log('[Store] Loaded vocab from lookups:', vocabItems.length, 'words');
+  },
+
   setFocusParagraph: (index) => set({ focusParagraphIndex: index }),
   setIsRecording: (isRecording) => set({ isRecording }),
   setCurrentCorrectionQuestionId: (id) => set({ currentCorrectionQuestionId: id }),
@@ -492,26 +556,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
   }),
 
   // Vocab Actions
-  initVocabSession: () => set((state) => {
-    const allWords = Array.from(new Set([...REQUIRED_VOCAB, ...state.lookups]));
-    const vocabList = allWords.map(generateVocabItem);
-    const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
-    vocabList.forEach(v => vocabStatus[v.word] = 'unseen'); // Start all as unseen (or needs_review logic)
+  initVocabSession: () => {
+    // 如果有查词记录，使用真实数据
+    const lookups = get().lookups;
+    if (lookups.length > 0) {
+      // 调用异步加载（不阻塞）
+      get().loadVocabFromLookups();
+    } else {
+      // 没有查词记录，使用默认词汇（保持向后兼容）
+      const allWords = REQUIRED_VOCAB;
+      const vocabList = allWords.map(generateVocabItem);
+      const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
+      vocabList.forEach(v => vocabStatus[v.word] = 'unseen');
 
-    return {
-      vocabList,
-      vocabStatus,
-      currentVocabIndex: 0,
-      phase4Step: 'flashcards',
-      exitPassStep: 'check',
-      remedialQueue: [],
-      remedialIndex: 0,
-      vocabCardFlipped: false,
-      isSyllableMode: false,
-      isPlayingAudio: 'none',
-      vocabSpeakEnabled: false
-    };
-  }),
+      set({
+        vocabList,
+        vocabStatus,
+        currentVocabIndex: 0,
+        phase4Step: 'flashcards',
+        exitPassStep: 'check',
+        remedialQueue: [],
+        remedialIndex: 0,
+        vocabCardFlipped: false,
+        isSyllableMode: false,
+        isPlayingAudio: 'none',
+        vocabSpeakEnabled: false
+      });
+    }
+  },
   nextVocabCard: () => set((state) => {
     const nextIndex = state.currentVocabIndex + 1;
     if (nextIndex >= state.vocabList.length) {

@@ -116,7 +116,7 @@ import { VideoWindow } from '../src/components/shared/VideoWindow';
 // --- Main Container ---
 
 const Classroom: React.FC = () => {
-    const { userRole, viewMode, currentStage, remoteStream } = useGameStore();
+    const { userRole, viewMode, currentStage, remoteStream, isLoading, loadVersion } = useGameStore();
     const navigate = useNavigate();
     const [remainingSeconds, setRemainingSeconds] = useState(420); // 7分钟（实战阶段专用）
 
@@ -130,6 +130,18 @@ const Classroom: React.FC = () => {
     useEffect(() => {
         if (!userRole) navigate('/');
     }, [userRole, navigate]);
+
+    // 加载文章版本数据
+    // TODO: articleId 和 level 应该从路由或配置中获取
+    useEffect(() => {
+        // 示例：加载文章 ID 1 的 L0 版本
+        // 实际使用时应该从 URL 参数或用户选择中获取
+        const articleId = 1;
+        const level = 'L0';
+
+        console.log('[Classroom] Loading version data for article:', articleId, level);
+        loadVersion(articleId, level);
+    }, []); // 只在组件挂载时加载一次
 
 
     // 倒计时逻辑（仅在实战阶段运行）
