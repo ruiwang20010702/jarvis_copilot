@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     CloudRain, Radar, Check, Clock, User,
     Play, Sparkles, ArrowRight, Loader2, BookOpen, Target, AlertTriangle
 } from 'lucide-react';
@@ -31,9 +31,9 @@ const SKILL_SCRIPT = [
  * 教师端技能阶段主组件
  */
 export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { 
-        skillNode, 
-        studentHasEquipped, 
+    const {
+        skillNode,
+        studentHasEquipped,
         studentConfirmedFormula,
         studentDemoStep,
         demoTeacherStep,
@@ -44,14 +44,15 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         quizCompleted,
         skillQuizHighlightedWords,
         skillQuizSelectedAnswer,
-        skillQuizWrongAttempt
+        skillQuizWrongAttempt,
+        remoteStream
     } = useGameStore();
-    
+
     const [scriptIndex, setScriptIndex] = useState(0);
-    
+
     // 当前题目
     const currentQuiz = DEMO_QUIZ_DATA[currentQuizIndex] || DEMO_QUIZ_DATA[0];
-    
+
     // 根据状态同步 scriptIndex
     // scriptIndex 反映"老师接下来可以做什么"，基于学生完成进度
     useEffect(() => {
@@ -81,9 +82,9 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             setScriptIndex(6);
         }
     }, [skillNode, studentHasEquipped, studentConfirmedFormula, studentDemoStep]);
-    
+
     const currentScript = SKILL_SCRIPT[scriptIndex] || SKILL_SCRIPT[0];
-    
+
     // 主控按钮点击处理
     const handleMainAction = () => {
         if (scriptIndex === 0) {
@@ -107,12 +108,12 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             advanceSkillNode(); // 2 -> 3
         }
     };
-    
+
     // 下一阶段
     const handleNextStage = () => {
         setStage('battle');
     };
-    
+
     // 按钮状态判断
     const getButtonState = () => {
         // 等待装备
@@ -123,7 +124,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (scriptIndex === 2 && !studentConfirmedFormula) {
             return { disabled: true, message: "等待学生确认口诀...", color: "gray", subtext: "学生正在学习口诀" };
         }
-        
+
         // 演示阶段逻辑：老师先点击启动，学生执行，完成后老师可推进下一步
         // 步骤1：老师启动演示
         if (scriptIndex === 3 && demoTeacherStep === 0) {
@@ -133,7 +134,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (scriptIndex === 3 && demoTeacherStep >= 1) {
             return { disabled: true, message: "等待学生操作...", color: "gray", subtext: "学生需要点击 '1969'" };
         }
-        
+
         // 步骤2：学生完成步骤1，老师可推进步骤2（触发扫描）
         if (scriptIndex === 4 && demoTeacherStep < 2) {
             return { disabled: false, message: "步骤 2: 搜原句", color: "blue", subtext: "✓ 学生已完成圈路标" };
@@ -142,7 +143,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (scriptIndex === 4 && demoTeacherStep >= 2) {
             return { disabled: true, message: "扫描中...", color: "gray", subtext: "扫描动画进行中" };
         }
-        
+
         // 步骤3：学生完成步骤2，老师可推进步骤3（触发锁定）
         if (scriptIndex === 5 && demoTeacherStep < 3) {
             return { disabled: false, message: "步骤 3: 锁答案", color: "blue", subtext: "✓ 学生已完成搜原句" };
@@ -151,12 +152,12 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (scriptIndex === 5 && demoTeacherStep >= 3) {
             return { disabled: true, message: "锁定中...", color: "gray", subtext: "锁定动画进行中" };
         }
-        
+
         // 演示完成，可以开始练手
         if (scriptIndex === 6 && skillNode === 2) {
             return { disabled: false, message: "开始练手", color: "blue", subtext: "✓ 演示完成！" };
         }
-        
+
         // Quiz阶段监控
         if (skillNode === 3 && !quizCompleted) {
             return { disabled: true, message: "监控中...", color: "gray", subtext: `Q${currentQuizIndex + 1}/5` };
@@ -165,12 +166,12 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (skillNode === 3 && quizCompleted) {
             return { disabled: false, message: "下一阶段", color: "green", subtext: "学生已完成所有题目" };
         }
-        
+
         return { disabled: false, message: currentScript.buttonText, color: "blue", subtext: "" };
     };
-    
+
     const buttonState = getButtonState();
-    
+
     // 获取步骤标签
     const getStepLabel = () => {
         if (scriptIndex === 0) return 'START';
@@ -188,13 +189,13 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     backgroundImage: 'linear-gradient(rgba(0,180,238,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,180,238,0.3) 1px, transparent 1px)',
                     backgroundSize: '30px 30px'
                 }} />
-                
+
                 <div className="relative z-10 flex flex-col h-full p-8">
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="w-2 h-2 rounded-full animate-pulse" 
-                             style={{ backgroundColor: '#00B4EE', boxShadow: '0 0 8px rgba(0,180,238,0.5)' }} />
-                        <span className="text-xs font-mono font-bold uppercase tracking-widest" 
-                              style={{ color: '#00B4EE' }}>
+                        <div className="w-2 h-2 rounded-full animate-pulse"
+                            style={{ backgroundColor: '#00B4EE', boxShadow: '0 0 8px rgba(0,180,238,0.5)' }} />
+                        <span className="text-xs font-mono font-bold uppercase tracking-widest"
+                            style={{ color: '#00B4EE' }}>
                             LIVE STAGE MIRROR
                         </span>
                     </div>
@@ -210,7 +211,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 <div className="text-white/40 text-base">点击右侧按钮开始课程</div>
                             </motion.div>
                         )}
-                        
+
                         {/* 文字雨 */}
                         {skillNode === 1 && (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
@@ -221,11 +222,11 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 <div className="text-white/40 text-base">学生正在体验信息过载...</div>
                             </motion.div>
                         )}
-                        
+
                         {/* 等待装备 */}
                         {skillNode === 2 && !studentHasEquipped && (
                             <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
-                                <motion.div 
+                                <motion.div
                                     className="rounded-2xl p-8 shadow-2xl inline-flex items-center justify-center mb-4"
                                     style={{ background: 'linear-gradient(135deg, #FDE700 0%, #D4C400 100%)' }}
                                     animate={{ rotate: [0, 360] }}
@@ -240,7 +241,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
                             </motion.div>
                         )}
-                        
+
                         {/* 口诀阶段 */}
                         {skillNode === 2 && studentHasEquipped && !studentConfirmedFormula && (
                             <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
@@ -259,7 +260,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 <div className="text-white/60 text-base font-mono">等待学生确认口诀...</div>
                             </motion.div>
                         )}
-                        
+
                         {/* 演示阶段 */}
                         {skillNode === 2 && studentHasEquipped && studentConfirmedFormula && (
                             <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="text-center">
@@ -269,15 +270,14 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                         const isActive = num === demoTeacherStep && num > studentDemoStep;
                                         const isWaiting = num === studentDemoStep + 1 && demoTeacherStep >= num;
                                         return (
-                                            <motion.div 
+                                            <motion.div
                                                 key={num}
-                                                animate={isWaiting ? { scale: [1, 1.2, 1] } : {}} 
+                                                animate={isWaiting ? { scale: [1, 1.2, 1] } : {}}
                                                 transition={{ repeat: Infinity, duration: 1.5 }}
-                                                className={`w-20 h-20 rounded-xl flex items-center justify-center text-white font-bold text-3xl shadow-lg ${
-                                                    isCompleted ? 'bg-gradient-to-br from-emerald-400 to-green-500' 
-                                                    : isActive || isWaiting ? 'bg-gradient-to-br from-cyan-400 to-blue-500' 
-                                                    : 'bg-gradient-to-br from-gray-600 to-gray-700'
-                                                }`}
+                                                className={`w-20 h-20 rounded-xl flex items-center justify-center text-white font-bold text-3xl shadow-lg ${isCompleted ? 'bg-gradient-to-br from-emerald-400 to-green-500'
+                                                        : isActive || isWaiting ? 'bg-gradient-to-br from-cyan-400 to-blue-500'
+                                                            : 'bg-gradient-to-br from-gray-600 to-gray-700'
+                                                    }`}
                                             >
                                                 {isCompleted ? <Check size={32} /> : num}
                                             </motion.div>
@@ -295,7 +295,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
                             </motion.div>
                         )}
-                        
+
                         {/* Quiz监控 */}
                         {skillNode === 3 && !quizCompleted && (
                             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-xl">
@@ -313,7 +313,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                             <span className="text-xs font-bold" style={{ color: '#00B4EE' }}>LIVE</span>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-4">
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
@@ -331,19 +331,19 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                 />
                                             </div>
                                         </div>
-                                        
+
                                         <div className="bg-slate-700/50 rounded-lg p-4">
                                             <div className="text-xs font-bold text-slate-400 uppercase mb-2">当前题目</div>
                                             <p className="text-sm text-white font-serif">{currentQuiz.question}</p>
                                         </div>
-                                        
+
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-bold text-slate-400 uppercase">学生选择</span>
                                             <span className="text-sm font-mono" style={{ color: skillQuizSelectedAnswer ? '#00B4EE' : '#64748b' }}>
                                                 {skillQuizSelectedAnswer || '思考中...'}
                                             </span>
                                         </div>
-                                        
+
                                         {skillQuizHighlightedWords.length > 0 && (
                                             <div>
                                                 <span className="text-xs font-bold text-slate-400 uppercase">已标记关键词</span>
@@ -358,7 +358,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
                             </motion.div>
                         )}
-                        
+
                         {/* Quiz完成 */}
                         {skillNode === 3 && quizCompleted && (
                             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
@@ -380,11 +380,12 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
 
             {/* Right Pane: 30% */}
             <div className="flex-[3] flex flex-col gap-4 h-full overflow-hidden">
-                
+
                 {/* 视频窗口 - 支持跨阶段平滑动画 */}
                 <VideoWindow
                     layoutId="coach-video"
                     className="relative w-full shrink-0 rounded-xl shadow-md"
+                    videoStream={remoteStream}
                 />
 
                 {/* 控制按钮 */}
@@ -392,7 +393,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     <div className="text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
                         STEP {scriptIndex} - {getStepLabel()}
                     </div>
-                    
+
                     {buttonState.color === "green" ? (
                         <button
                             onClick={handleNextStage}
@@ -418,7 +419,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                             <span>{buttonState.message}</span>
                         </button>
                     )}
-                    
+
                     {/* 状态提示 */}
                     {buttonState.subtext && (
                         <div className={`mt-2 text-xs ${buttonState.subtext.startsWith('✓') ? 'text-emerald-600' : 'text-slate-400'}`}>
@@ -428,12 +429,10 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                 </div>
 
                 {/* Jarvis */}
-                <div className={`flex-1 flex flex-col rounded-2xl border shadow-sm overflow-hidden min-h-0 ${
-                    skillQuizWrongAttempt ? 'border-red-400 bg-red-50' : 'bg-white border-slate-200'
-                }`}>
-                    <div className={`px-4 py-3 flex items-center gap-2 border-b shrink-0 ${
-                        skillQuizWrongAttempt ? 'bg-gradient-to-r from-red-500 to-orange-500 border-red-400' : 'bg-gradient-to-r from-cyan-500 to-blue-600 border-white/10'
+                <div className={`flex-1 flex flex-col rounded-2xl border shadow-sm overflow-hidden min-h-0 ${skillQuizWrongAttempt ? 'border-red-400 bg-red-50' : 'bg-white border-slate-200'
                     }`}>
+                    <div className={`px-4 py-3 flex items-center gap-2 border-b shrink-0 ${skillQuizWrongAttempt ? 'bg-gradient-to-r from-red-500 to-orange-500 border-red-400' : 'bg-gradient-to-r from-cyan-500 to-blue-600 border-white/10'
+                        }`}>
                         <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center">
                             {skillQuizWrongAttempt ? <AlertTriangle size={16} className="text-white" /> : <Sparkles size={16} className="text-white" />}
                         </div>
@@ -484,7 +483,7 @@ export const CoachSkillView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                         {currentScript.jarvisContent}
                                     </p>
                                 </div>
-                                
+
                                 {skillNode === 3 && !quizCompleted && (
                                     <div className="mt-4 p-4 rounded-lg border" style={{ borderColor: 'rgba(0, 180, 238, 0.2)', backgroundColor: 'rgba(0, 180, 238, 0.05)' }}>
                                         <div className="text-xs font-bold text-slate-500 uppercase mb-2">当前题目 Q{currentQuizIndex + 1}</div>

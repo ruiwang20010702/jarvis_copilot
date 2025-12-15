@@ -8,7 +8,22 @@
 import { useGameStore } from '../store';
 
 // WebSocket 服务器地址 (优先使用环境变量)
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+// Auto-convert ws:// to wss:// when page is loaded over HTTPS
+function getWebSocketUrl(): string {
+    const envUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+
+    // If page is HTTPS, WebSocket must also be secure (wss://)
+    if (window.location.protocol === 'https:' && envUrl.startsWith('ws://')) {
+        const secureUrl = envUrl.replace('ws://', 'wss://');
+        console.log('[Sync] HTTPS detected, upgrading WebSocket to secure:', secureUrl);
+        return secureUrl;
+    }
+
+    return envUrl;
+}
+
+const WS_URL = getWebSocketUrl();
+
 
 // 需要同步的状态字段（排除函数和临时状态）
 const SYNC_KEYS = [
@@ -184,6 +199,11 @@ function handleMessage(message: { type: string; payload?: SyncPayload; clientId?
             useGameStore.getState().reset();
             isReceiving = false;
             break;
+
+        case 'WEBRTC_SIGNAL':
+            // Notify signal subscribers
+            signalSubscribers.forEach(cb => cb(message.payload, message.senderId, (message as any).senderRole));
+            break;
     }
 }
 
@@ -306,6 +326,39 @@ export function resetRoom() {
 
     console.log('[Sync] 🔄 已发送重置房间请求');
     return true;
+}
+
+// WebRTC Signaling Subscribers
+type SignalCallback = (payload: any, senderId?: string, senderRole?: string) => void;
+const signalSubscribers: SignalCallback[] = [];
+
+/**
+ * 订阅 WebRTC 信令消息
+ */
+export function subscribeToSignal(callback: SignalCallback) {
+    signalSubscribers.push(callback);
+    return () => {
+        const index = signalSubscribers.indexOf(callback);
+        if (index > -1) {
+            signalSubscribers.splice(index, 1);
+        }
+    };
+}
+
+/**
+ * 发送 WebRTC 信令消息
+ */
+export function sendSignal(payload: any) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        console.warn('[Sync] 无法发送信令：WebSocket 未连接');
+        return;
+    }
+    socket.send(JSON.stringify({
+        type: 'WEBRTC_SIGNAL',
+        payload,
+        role: currentRole,
+        timestamp: Date.now()
+    }));
 }
 
 export { clientId as TAB_ID };

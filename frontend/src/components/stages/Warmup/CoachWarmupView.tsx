@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     Target, Mountain, Music, BarChart3,
     Sparkles, MessageSquare, ArrowRight, Dribbble, Snowflake,
     GraduationCap, BrainCircuit, HeartHandshake, Flame
@@ -13,21 +13,21 @@ import {
  * Coach Warmup View - 监控学生信息并引导对话
  */
 export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-     const { addMessage, setQuickReplies, messages } = useGameStore();
-     const [coachInput, setCoachInput] = useState("");
-     const chatRef = useRef<HTMLDivElement>(null);
+    const { addMessage, setQuickReplies, messages, remoteStream } = useGameStore();
+    const [coachInput, setCoachInput] = useState("");
+    const chatRef = useRef<HTMLDivElement>(null);
 
-     useEffect(() => {
-        if(chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-     }, [messages]);
+    useEffect(() => {
+        if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }, [messages]);
 
-     const handleSendCoachMsg = () => {
-         if (!coachInput.trim()) return;
-         addMessage({ role: 'coach', text: coachInput });
-         setCoachInput("");
-     };
+    const handleSendCoachMsg = () => {
+        if (!coachInput.trim()) return;
+        addMessage({ role: 'coach', text: coachInput });
+        setCoachInput("");
+    };
 
-     const triggerOpening = () => {
+    const triggerOpening = () => {
         addMessage({ role: 'coach', text: 'Hi Alex! 我注意到你喜欢篮球，今天准备好读一篇篮球相关的文章了吗？' });
         setQuickReplies(["教练好！我准备好了！🏀", "我想先聊聊昨天的比赛"]);
     };
@@ -35,7 +35,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
     return (
         <main className="h-full w-full flex bg-gray-50 p-6 gap-6 overflow-hidden">
             {/* Left Pane (70%): 学员全景档案 */}
-            <div 
+            <div
                 className="flex-[7] bg-white rounded-3xl shadow-sm p-8 flex flex-col h-full overflow-auto"
                 style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
             >
@@ -45,7 +45,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">
                         学员信息 / Student Profile
                     </h2>
-                    
+
                     {/* 主信息行：左(头像/姓名) + 中(阅读挑战) + 右(标签矩阵) */}
                     <div className="flex items-center justify-between gap-10">
                         {/* 左侧：头像 + 名字 */}
@@ -71,7 +71,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                 DAYS
                             </span>
                         </div>
-                        
+
                         {/* 右侧：标签矩阵 (品牌蓝 #00B4EE/黄 深色系文字 + 呼吸动效) */}
                         <div className="flex flex-col gap-3 items-end">
                             {/* Row 1: 兴趣标签 */}
@@ -120,10 +120,10 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                             核心数据看板
                         </h3>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-6 h-[calc(100%-3rem)]">
                         {/* 词汇量 */}
-                        <div 
+                        <div
                             className="bg-gray-50 rounded-xl p-6 flex flex-col justify-center"
                             style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                         >
@@ -135,9 +135,9 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                             </div>
                             <div className="text-sm text-slate-400">掌握单词数</div>
                         </div>
-                        
+
                         {/* 当前等级 */}
-                        <div 
+                        <div
                             className="bg-gray-50 rounded-xl p-6 flex flex-col justify-center"
                             style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                         >
@@ -149,9 +149,9 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                             </div>
                             <div className="text-sm text-slate-400">初级阅读者</div>
                         </div>
-                        
+
                         {/* 今日目标 */}
-                        <div 
+                        <div
                             className="bg-gray-50 rounded-xl p-6 flex flex-col justify-center"
                             style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                         >
@@ -163,9 +163,9 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                             </div>
                             <div className="text-sm text-slate-400">篇文章</div>
                         </div>
-                        
+
                         {/* 专项技能 */}
-                        <div 
+                        <div
                             className="bg-gray-50 rounded-xl p-6 flex flex-col justify-center"
                             style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                         >
@@ -189,10 +189,12 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                     className="relative w-full shrink-0 rounded-xl shadow-md"
                     placeholderText="学生视频连线中..."
                     style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
+                    videoStream={remoteStream}
                 />
 
+
                 {/* Slot 2: Jarvis 建议 */}
-                <div 
+                <div
                     className="shrink-0 bg-white rounded-xl shadow-sm p-5"
                     style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                 >
@@ -223,7 +225,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                 </div>
 
                 {/* Slot 3: 互动窗口 (Chat) */}
-                <div 
+                <div
                     className="flex-1 flex flex-col bg-white rounded-xl overflow-hidden shadow-sm min-h-0"
                     style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}
                 >
@@ -231,7 +233,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">互动窗口</span>
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                     </div>
-                    
+
                     <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
                         {messages.length === 0 ? (
                             <div className="h-full flex items-center justify-center text-slate-300">
@@ -244,14 +246,13 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                             messages.map((m) => (
                                 <div key={m.id} className={`flex flex-col ${m.role === 'coach' ? 'items-end' : 'items-start'}`}>
                                     <span className="text-[10px] text-slate-400 mb-1 uppercase">{m.role}</span>
-                                    <div className={`p-3 rounded-xl max-w-[85%] text-sm ${
-                                        m.role === 'coach' 
-                                        ? 'text-white' 
-                                        : m.role === 'student'
-                                        ? 'bg-slate-100 text-slate-700' 
-                                        : 'bg-yellow-50 text-yellow-800'
-                                    }`}
-                                    style={m.role === 'coach' ? { backgroundColor: '#00B4EE' } : {}}
+                                    <div className={`p-3 rounded-xl max-w-[85%] text-sm ${m.role === 'coach'
+                                            ? 'text-white'
+                                            : m.role === 'student'
+                                                ? 'bg-slate-100 text-slate-700'
+                                                : 'bg-yellow-50 text-yellow-800'
+                                        }`}
+                                        style={m.role === 'coach' ? { backgroundColor: '#00B4EE' } : {}}
                                     >
                                         {m.text}
                                     </div>
@@ -261,14 +262,14 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                     </div>
 
                     <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2 shrink-0">
-                        <input 
+                        <input
                             className="flex-1 bg-white text-slate-800 text-sm px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-200"
                             placeholder="给学生留言..."
                             value={coachInput}
                             onChange={(e) => setCoachInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendCoachMsg()}
                         />
-                        <button 
+                        <button
                             onClick={handleSendCoachMsg}
                             className="p-2 rounded-lg transition-colors flex items-center justify-center"
                             style={{ backgroundColor: '#00B4EE' }}

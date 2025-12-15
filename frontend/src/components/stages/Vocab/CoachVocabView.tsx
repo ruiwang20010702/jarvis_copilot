@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     Monitor, ChevronLeft, ChevronRight, RotateCw, Volume2,
     Eye, ListChecks, Check, Trophy, Play, RefreshCcw,
     Mic, Sparkles, MessageCircle, FlipVertical, Type
@@ -62,14 +62,14 @@ const VOCAB_TEACHING_SCRIPT = [
  * Vocab Coach View - 监控学生学习状态并提供控制
  */
 export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { 
-        vocabList, 
-        currentVocabIndex, 
-        phase4Step, 
-        exitPassStep, 
-        remedialQueue, 
+    const {
+        vocabList,
+        currentVocabIndex,
+        phase4Step,
+        exitPassStep,
+        remedialQueue,
         remedialIndex,
-        vocabCardFlipped, 
+        vocabCardFlipped,
         setVocabCardFlipped,
         nextVocabCard,
         toggleSyllableMode,
@@ -77,26 +77,27 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         vocabStatus,
         isSyllableMode,
         toggleVocabCheck,
-        submitExitPass
+        submitExitPass,
+        remoteStream
     } = useGameStore();
 
     const currentCard = vocabList[currentVocabIndex];
     const currentRemedialWord = remedialQueue[remedialIndex];
     const currentRemedialCard = vocabList.find(v => v.word === currentRemedialWord);
     const checkedVocabWords = Object.keys(vocabStatus).filter(word => vocabStatus[word] === 'mastered');
-    
+
     const [cardKey, setCardKey] = useState(0);
     const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
-    
+
     // 教学步骤状态 (0=播放, 1=音节, 2=翻转, 3=跟读, 4=下一个)
     const [teachingStep, setTeachingStep] = useState(0);
     // 跟读Demo状态
     const [isRecording, setIsRecording] = useState(false);
     const [recordingScore, setRecordingScore] = useState<number | null>(null);
-    
+
     // 当前剧本
     const currentScript = VOCAB_TEACHING_SCRIPT[teachingStep];
-    
+
     // 切换单词时完全重置所有状态（教学步骤 + 卡片状态）
     useEffect(() => {
         setCardKey(prev => prev + 1);
@@ -104,7 +105,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         setIsRecording(false);
         setRecordingScore(null);
         // 同时重置卡片的翻转和音节状态，以及跟读权限
-        useGameStore.setState({ 
+        useGameStore.setState({
             vocabCardFlipped: false,
             isSyllableMode: false,
             vocabSpeakEnabled: false
@@ -119,14 +120,14 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             setIsRecording(false);
             setRecordingScore(null);
             // 再更新全局状态（这会触发 useEffect）
-            useGameStore.setState({ 
-                currentVocabIndex: prevIndex, 
+            useGameStore.setState({
+                currentVocabIndex: prevIndex,
                 vocabCardFlipped: false,
                 isSyllableMode: false
             });
         }
     };
-    
+
     // 处理下一个单词
     const handleNextVocabCard = () => {
         // 先重置本地状态
@@ -136,7 +137,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         // 再调用全局的 nextVocabCard（这会触发 useEffect）
         nextVocabCard();
     };
-    
+
     // 处理播放按钮点击
     const handlePlayClick = () => {
         playStandardAudio();
@@ -144,7 +145,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             setTeachingStep(1);
         }
     };
-    
+
     // 处理音节按钮点击
     const handleSyllableClick = () => {
         toggleSyllableMode();
@@ -152,7 +153,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             setTeachingStep(2);
         }
     };
-    
+
     // 处理翻转按钮点击
     const handleFlipClick = () => {
         setVocabCardFlipped(!vocabCardFlipped);
@@ -160,12 +161,12 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             setTeachingStep(3);
         }
     };
-    
+
     // 处理跟读Demo
     const handleSpeakClick = () => {
         // 启用学生端的麦克风
         useGameStore.setState({ vocabSpeakEnabled: true });
-        
+
         if (!isRecording && recordingScore === null) {
             // 开始录音
             setIsRecording(true);
@@ -181,12 +182,12 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             }, 2000);
         }
     };
-    
+
     // 判断按钮是否应该闪烁
     const shouldPulse = (buttonName: string) => {
         if (phase4Step !== 'flashcards') return false;
         if (currentScript?.buttonTarget !== buttonName) return false;
-        
+
         // 根据不同按钮判断是否已完成
         switch (buttonName) {
             case 'play':
@@ -207,7 +208,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
     return (
         <main className="flex h-full w-full bg-slate-50">
             {/* 左侧：学生镜像 */}
-            <div 
+            <div
                 className="flex-1 flex flex-col items-center justify-center p-8 border-r border-slate-200 relative overflow-hidden"
                 style={{
                     background: 'linear-gradient(135deg, rgba(0, 180, 238, 0.08) 0%, rgba(0, 180, 238, 0.12) 40%, rgba(253, 231, 0, 0.1) 70%, rgba(253, 231, 0, 0.15) 100%)'
@@ -219,26 +220,25 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                         <Monitor size={14} /> 学生镜像
                     </span>
                     <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase">
-                        {phase4Step === 'flashcards' 
-                            ? '卡片模式' 
-                            : phase4Step === 'exitpass' && exitPassStep === 'check' 
-                            ? '出门测: 检查'
-                            : phase4Step === 'exitpass' && exitPassStep === 'remedial'
-                            ? '🔄 回炉学习'
-                            : '完成'
+                        {phase4Step === 'flashcards'
+                            ? '卡片模式'
+                            : phase4Step === 'exitpass' && exitPassStep === 'check'
+                                ? '出门测: 检查'
+                                : phase4Step === 'exitpass' && exitPassStep === 'remedial'
+                                    ? '🔄 回炉学习'
+                                    : '完成'
                         }
                     </span>
                 </div>
-                
 
-                <div className={`w-full max-w-4xl transition-all ${
-                    phase4Step === 'exitpass' && exitPassStep === 'check' 
-                    ? 'scale-100 opacity-100' 
-                    : 'scale-75 origin-center opacity-90'
-                }`}>
+
+                <div className={`w-full max-w-4xl transition-all ${phase4Step === 'exitpass' && exitPassStep === 'check'
+                        ? 'scale-100 opacity-100'
+                        : 'scale-75 origin-center opacity-90'
+                    }`}>
                     <AnimatePresence mode="wait">
                         {phase4Step === 'flashcards' && currentCard ? (
-                            <motion.div 
+                            <motion.div
                                 key={`flashcard-${cardKey}`}
                                 initial={{ opacity: 0, x: slideDirection === 'right' ? 50 : -50 }}
                                 animate={{ opacity: 1, x: 0 }}
@@ -253,23 +253,22 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     </span>
                                     <div className="flex gap-1">
                                         {VOCAB_TEACHING_SCRIPT.slice(0, 4).map((s, idx) => (
-                                            <div 
+                                            <div
                                                 key={idx}
-                                                className={`w-2 h-2 rounded-full transition-all ${
-                                                    idx < teachingStep ? 'bg-[#00B4EE]' : 
-                                                    idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
-                                                }`}
+                                                className={`w-2 h-2 rounded-full transition-all ${idx < teachingStep ? 'bg-[#00B4EE]' :
+                                                        idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
+                                                    }`}
                                             />
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 <div className="aspect-[16/10] bg-white rounded-[3rem] shadow-xl border border-slate-200 flex flex-col items-center justify-center relative p-10">
                                     <h2 className="text-7xl font-serif font-bold text-slate-800">
                                         {isSyllableMode && currentCard.syllables ? currentCard.syllables.join('·') : currentCard.word}
                                     </h2>
                                     {vocabCardFlipped && (
-                                        <motion.div 
+                                        <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             className="mt-8 bg-slate-50 rounded-xl p-4 w-full text-center"
@@ -291,11 +290,10 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                     <Mic size={18} className="text-red-500" />
                                                 </div>
                                             ) : recordingScore !== null && (
-                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${
-                                                    recordingScore >= 80 
-                                                        ? 'bg-emerald-50 border-2 border-emerald-200' 
+                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
+                                                        ? 'bg-emerald-50 border-2 border-emerald-200'
                                                         : 'bg-amber-50 border-2 border-amber-200'
-                                                }`}>
+                                                    }`}>
                                                     {recordingScore >= 80 ? (
                                                         <>
                                                             <Sparkles size={18} className="text-emerald-500" />
@@ -313,7 +311,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
                             </motion.div>
                         ) : phase4Step === 'exitpass' && exitPassStep === 'check' ? (
-                            <motion.div 
+                            <motion.div
                                 key="check"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -330,13 +328,12 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     {vocabList.map((item) => {
                                         const isMastered = vocabStatus[item.word] === 'mastered';
                                         return (
-                                            <div 
+                                            <div
                                                 key={item.word}
-                                                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                                                    isMastered 
-                                                    ? 'bg-emerald-50 border-emerald-100' 
-                                                    : 'bg-white border-slate-100'
-                                                }`}
+                                                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isMastered
+                                                        ? 'bg-emerald-50 border-emerald-100'
+                                                        : 'bg-white border-slate-100'
+                                                    }`}
                                             >
                                                 <div className="flex-1">
                                                     <div className="text-xl font-serif font-bold text-slate-800">
@@ -346,13 +343,12 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                         {item.definition}
                                                     </div>
                                                 </div>
-                                                <div 
+                                                <div
                                                     onClick={() => toggleVocabCheck(item.word)}
-                                                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
-                                                        isMastered 
-                                                        ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
-                                                        : 'bg-white border-slate-300 cursor-pointer hover:border-emerald-400'
-                                                    }`}
+                                                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isMastered
+                                                            ? 'bg-emerald-500 border-emerald-500 cursor-pointer'
+                                                            : 'bg-white border-slate-300 cursor-pointer hover:border-emerald-400'
+                                                        }`}
                                                 >
                                                     {isMastered && <Check size={16} className="text-white" strokeWidth={3} />}
                                                 </div>
@@ -363,88 +359,86 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                             </motion.div>
                         ) : phase4Step === 'exitpass' && exitPassStep === 'remedial' ? (
                             currentRemedialCard ? (
-                            <motion.div 
-                                key={`remedial-${remedialIndex}`}
-                                initial={{ opacity: 0, x: 50 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -50 }}
-                                transition={{ duration: 0.35, ease: 'easeInOut' }}
-                                className="relative"
-                            >
-                                {/* 回炉学习进度显示 */}
-                                <div className="absolute -top-8 left-0 right-0 flex items-center justify-center gap-3">
-                                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-100">
-                                        <RefreshCcw size={14} className="text-orange-500" />
-                                        <span className="text-orange-600 text-sm font-bold">回炉学习</span>
+                                <motion.div
+                                    key={`remedial-${remedialIndex}`}
+                                    initial={{ opacity: 0, x: 50 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -50 }}
+                                    transition={{ duration: 0.35, ease: 'easeInOut' }}
+                                    className="relative"
+                                >
+                                    {/* 回炉学习进度显示 */}
+                                    <div className="absolute -top-8 left-0 right-0 flex items-center justify-center gap-3">
+                                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-100">
+                                            <RefreshCcw size={14} className="text-orange-500" />
+                                            <span className="text-orange-600 text-sm font-bold">回炉学习</span>
+                                        </div>
+                                        <span className="text-slate-400 text-sm font-medium">
+                                            {remedialIndex + 1} / {remedialQueue.length}
+                                        </span>
+                                        <div className="flex gap-1">
+                                            {VOCAB_TEACHING_SCRIPT.slice(0, 4).map((s, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className={`w-2 h-2 rounded-full transition-all ${idx < teachingStep ? 'bg-[#00B4EE]' :
+                                                            idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
+                                                        }`}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
-                                    <span className="text-slate-400 text-sm font-medium">
-                                        {remedialIndex + 1} / {remedialQueue.length}
-                                    </span>
-                                    <div className="flex gap-1">
-                                        {VOCAB_TEACHING_SCRIPT.slice(0, 4).map((s, idx) => (
-                                            <div 
-                                                key={idx}
-                                                className={`w-2 h-2 rounded-full transition-all ${
-                                                    idx < teachingStep ? 'bg-[#00B4EE]' : 
-                                                    idx === teachingStep ? 'bg-[#FDE700]' : 'bg-slate-200'
-                                                }`}
-                                            />
-                                        ))}
+
+                                    {/* 回炉单词卡片 */}
+                                    <div className="aspect-[16/10] bg-white rounded-[3rem] shadow-xl border border-orange-100 flex flex-col items-center justify-center relative p-10">
+                                        <h2 className="text-7xl font-serif font-bold text-slate-800">
+                                            {isSyllableMode && currentRemedialCard.syllables ? currentRemedialCard.syllables.join('·') : currentRemedialCard.word}
+                                        </h2>
+                                        {vocabCardFlipped && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="mt-8 bg-slate-50 rounded-xl p-4 w-full text-center"
+                                            >
+                                                <p className="text-slate-500">{currentRemedialCard.definition}</p>
+                                            </motion.div>
+                                        )}
+                                        {/* 跟读状态显示 */}
+                                        {(isRecording || recordingScore !== null) && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="absolute bottom-8 left-1/2 -translate-x-1/2"
+                                            >
+                                                {isRecording ? (
+                                                    <div className="flex items-center gap-3 px-6 py-3 bg-red-50 border-2 border-red-200 rounded-full">
+                                                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                                                        <span className="text-red-600 font-bold">录音中...</span>
+                                                        <Mic size={18} className="text-red-500" />
+                                                    </div>
+                                                ) : recordingScore !== null && (
+                                                    <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
+                                                            ? 'bg-emerald-50 border-2 border-emerald-200'
+                                                            : 'bg-amber-50 border-2 border-amber-200'
+                                                        }`}>
+                                                        {recordingScore >= 80 ? (
+                                                            <>
+                                                                <Sparkles size={18} className="text-emerald-500" />
+                                                                <span className="text-emerald-600 font-bold">发音很棒！{recordingScore}分</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-amber-600 font-bold">{recordingScore}分 - 再试一次？</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        )}
                                     </div>
-                                </div>
-                                
-                                {/* 回炉单词卡片 */}
-                                <div className="aspect-[16/10] bg-white rounded-[3rem] shadow-xl border border-orange-100 flex flex-col items-center justify-center relative p-10">
-                                    <h2 className="text-7xl font-serif font-bold text-slate-800">
-                                        {isSyllableMode && currentRemedialCard.syllables ? currentRemedialCard.syllables.join('·') : currentRemedialCard.word}
-                                    </h2>
-                                    {vocabCardFlipped && (
-                                        <motion.div 
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="mt-8 bg-slate-50 rounded-xl p-4 w-full text-center"
-                                        >
-                                            <p className="text-slate-500">{currentRemedialCard.definition}</p>
-                                        </motion.div>
-                                    )}
-                                    {/* 跟读状态显示 */}
-                                    {(isRecording || recordingScore !== null) && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="absolute bottom-8 left-1/2 -translate-x-1/2"
-                                        >
-                                            {isRecording ? (
-                                                <div className="flex items-center gap-3 px-6 py-3 bg-red-50 border-2 border-red-200 rounded-full">
-                                                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                                                    <span className="text-red-600 font-bold">录音中...</span>
-                                                    <Mic size={18} className="text-red-500" />
-                                                </div>
-                                            ) : recordingScore !== null && (
-                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${
-                                                    recordingScore >= 80 
-                                                        ? 'bg-emerald-50 border-2 border-emerald-200' 
-                                                        : 'bg-amber-50 border-2 border-amber-200'
-                                                }`}>
-                                                    {recordingScore >= 80 ? (
-                                                        <>
-                                                            <Sparkles size={18} className="text-emerald-500" />
-                                                            <span className="text-emerald-600 font-bold">发音很棒！{recordingScore}分</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="text-amber-600 font-bold">{recordingScore}分 - 再试一次？</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </motion.div>
-                                    )}
-                                </div>
-                            </motion.div>
+                                </motion.div>
                             ) : (
                                 /* Fallback: remedial 模式但卡片未加载 */
-                                <motion.div 
+                                <motion.div
                                     key="remedial-loading"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
@@ -469,6 +463,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     <VideoWindow
                         layoutId="coach-video"
                         className="relative w-full rounded-xl shadow-md"
+                        videoStream={remoteStream}
                     />
                 </div>
 
@@ -477,7 +472,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     {phase4Step === 'flashcards' && (
                         <>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">单词卡片控制</div>
-                            
+
                             {/* 导航按钮 */}
                             <div className="flex gap-2">
                                 <button
@@ -491,17 +486,16 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 <motion.button
                                     onClick={handleNextVocabCard}
                                     disabled={currentVocabIndex >= vocabList.length - 1}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('next') 
+                                    animate={{
+                                        boxShadow: shouldPulse('next')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('next') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`flex-1 py-3 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('next') 
-                                            ? 'bg-[#00B4EE]' 
+                                    className={`flex-1 py-3 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('next')
+                                            ? 'bg-[#00B4EE]'
                                             : 'bg-blue-500 hover:bg-blue-600'
-                                    }`}
+                                        }`}
                                 >
                                     <span>下一个</span>
                                     <ChevronRight size={16} />
@@ -513,83 +507,79 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 翻转按钮 - 只有当前步骤才闪烁 */}
                                 <motion.button
                                     onClick={handleFlipClick}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('flip') 
+                                    animate={{
+                                        boxShadow: shouldPulse('flip')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('flip') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('flip') 
-                                            ? 'bg-[#00B4EE] text-white' 
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('flip')
+                                            ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 hover:bg-slate-200'
-                                    }`}
+                                        }`}
                                 >
                                     <RotateCw size={14} />
                                     <span>翻转</span>
                                 </motion.button>
-                                
+
                                 {/* 播放按钮 - 只有当前步骤才闪烁 */}
                                 <motion.button
                                     onClick={handlePlayClick}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('play') 
+                                    animate={{
+                                        boxShadow: shouldPulse('play')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('play') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('play') 
-                                            ? 'bg-[#00B4EE] text-white' 
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('play')
+                                            ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 hover:bg-slate-200'
-                                    }`}
+                                        }`}
                                 >
                                     <Volume2 size={14} />
                                     <span>播放</span>
                                 </motion.button>
-                                
+
                                 {/* 音节按钮 - 只有当前步骤才闪烁 */}
                                 <motion.button
                                     onClick={handleSyllableClick}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('syllable') 
+                                    animate={{
+                                        boxShadow: shouldPulse('syllable')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('syllable') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('syllable') 
-                                            ? 'bg-[#00B4EE] text-white' 
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('syllable')
+                                            ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 hover:bg-slate-200'
-                                    }`}
+                                        }`}
                                 >
                                     <Eye size={14} />
                                     <span>音节</span>
                                 </motion.button>
-                                
+
                                 {/* 跟读按钮 - 只有当前步骤才闪烁 */}
                                 <motion.button
                                     onClick={handleSpeakClick}
                                     disabled={isRecording}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('speak') 
+                                    animate={{
+                                        boxShadow: shouldPulse('speak')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('speak') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('speak') 
-                                            ? 'bg-[#00B4EE] text-white' 
-                                            : isRecording 
-                                                ? 'bg-red-500 text-white' 
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('speak')
+                                            ? 'bg-[#00B4EE] text-white'
+                                            : isRecording
+                                                ? 'bg-red-500 text-white'
                                                 : 'bg-slate-100 hover:bg-slate-200'
-                                    }`}
+                                        }`}
                                 >
                                     <Mic size={14} />
                                     <span>{isRecording ? '录音中...' : recordingScore !== null ? `${recordingScore}分` : '跟读'}</span>
                                 </motion.button>
                             </div>
-                            
+
                             {/* 出口测按钮 */}
                             <button
                                 onClick={() => useGameStore.setState({ phase4Step: 'exitpass', exitPassStep: 'check' })}
@@ -600,7 +590,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                             </button>
 
                             {/* Jarvis 助教卡片 */}
-                            <motion.div 
+                            <motion.div
                                 key={teachingStep}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -616,17 +606,16 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     </div>
                                     {/* 阶段指示器 */}
                                     <div className="ml-auto flex items-center gap-1">
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                            currentScript?.phase === 'E' ? 'bg-blue-100 text-blue-700' :
-                                            currentScript?.phase === 'C' ? 'bg-green-100 text-green-700' :
-                                            currentScript?.phase === 'O' ? 'bg-amber-100 text-amber-700' :
-                                            'bg-emerald-100 text-emerald-700'
-                                        }`}>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${currentScript?.phase === 'E' ? 'bg-blue-100 text-blue-700' :
+                                                currentScript?.phase === 'C' ? 'bg-green-100 text-green-700' :
+                                                    currentScript?.phase === 'O' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-emerald-100 text-emerald-700'
+                                            }`}>
                                             {currentScript?.phase}
                                         </span>
                                     </div>
                                 </div>
-                                
+
                                 {/* Jarvis 内容 */}
                                 <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-700 mb-2">
@@ -636,11 +625,11 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                         {currentScript?.jarvisContent}
                                     </p>
                                 </div>
-                                
+
                                 {/* 操作提示 */}
                                 <div className="mt-4 pt-3 border-t border-cyan-100">
                                     <div className="flex items-center gap-2 text-xs text-cyan-700">
-                                        <motion.div 
+                                        <motion.div
                                             animate={{ scale: [1, 1.2, 1] }}
                                             transition={{ duration: 1, repeat: Infinity }}
                                             className="w-2 h-2 rounded-full bg-[#00B4EE]"
@@ -655,7 +644,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     {phase4Step === 'exitpass' && exitPassStep === 'check' && (
                         <div className="space-y-4">
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">出口测试控制</div>
-                            
+
                             <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
                                 <div className="text-xs font-bold text-blue-600 mb-1">已勾选</div>
                                 <div className="text-3xl font-bold text-blue-700">
@@ -685,7 +674,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                     {phase4Step === 'exitpass' && exitPassStep === 'remedial' && (
                         <>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">回炉学习控制</div>
-                            
+
                             <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
                                 <div className="text-xs font-bold text-orange-600 mb-1">当前进度</div>
                                 <div className="text-3xl font-bold text-orange-700">
@@ -702,7 +691,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     onClick={() => {
                                         const newIndex = remedialIndex - 1;
                                         if (newIndex >= 0) {
-                                            useGameStore.setState({ 
+                                            useGameStore.setState({
                                                 remedialIndex: newIndex,
                                                 vocabCardFlipped: false,
                                                 isSyllableMode: false,
@@ -738,17 +727,16 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 翻转按钮 */}
                                 <motion.button
                                     onClick={handleFlipClick}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('flip') 
+                                    animate={{
+                                        boxShadow: shouldPulse('flip')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('flip') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('flip')
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('flip')
                                             ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 text-slate-700'
-                                    }`}
+                                        }`}
                                 >
                                     <FlipVertical size={14} />
                                     <span>翻转</span>
@@ -757,17 +745,16 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 音节按钮 */}
                                 <motion.button
                                     onClick={handleSyllableClick}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('syllable') 
+                                    animate={{
+                                        boxShadow: shouldPulse('syllable')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('syllable') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('syllable')
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('syllable')
                                             ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 text-slate-700'
-                                    }`}
+                                        }`}
                                 >
                                     <Type size={14} />
                                     <span>音节</span>
@@ -776,17 +763,16 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 播放按钮 */}
                                 <motion.button
                                     onClick={() => { playStandardAudio(); setTeachingStep(1); }}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('play') 
+                                    animate={{
+                                        boxShadow: shouldPulse('play')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
                                             : '0 0 0 0 rgba(0, 180, 238, 0)'
                                     }}
                                     transition={shouldPulse('play') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
-                                        shouldPulse('play')
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('play')
                                             ? 'bg-[#00B4EE] text-white'
                                             : 'bg-slate-100 text-slate-700'
-                                    }`}
+                                        }`}
                                 >
                                     <Volume2 size={14} />
                                     <span>播放</span>
@@ -796,19 +782,18 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 <motion.button
                                     onClick={handleSpeakClick}
                                     disabled={isRecording}
-                                    animate={{ 
-                                        boxShadow: shouldPulse('readAloud') 
+                                    animate={{
+                                        boxShadow: shouldPulse('readAloud')
                                             ? ['0 0 0 0 rgba(239, 68, 68, 0)', '0 0 0 8px rgba(239, 68, 68, 0.3)', '0 0 0 0 rgba(239, 68, 68, 0)']
                                             : '0 0 0 0 rgba(239, 68, 68, 0)'
                                     }}
                                     transition={shouldPulse('readAloud') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${
-                                        isRecording
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${isRecording
                                             ? 'bg-red-500 text-white'
                                             : shouldPulse('readAloud')
-                                            ? 'bg-red-500 text-white'
-                                            : 'bg-slate-100 text-slate-700'
-                                    }`}
+                                                ? 'bg-red-500 text-white'
+                                                : 'bg-slate-100 text-slate-700'
+                                        }`}
                                 >
                                     <Mic size={14} />
                                     <span>{isRecording ? '录音中...' : recordingScore !== null ? `得分: ${recordingScore}` : '跟读'}</span>
@@ -816,7 +801,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                             </div>
 
                             {/* Jarvis 助教卡片 */}
-                            <motion.div 
+                            <motion.div
                                 key={teachingStep}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}

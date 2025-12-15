@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     BookOpen, X, CheckCircle2, Sparkles,
     Send, Mic, Highlighter, MousePointer2,
     Navigation, Trophy, ChevronRight, BarChart3, HelpCircle, ChevronDown
 } from 'lucide-react';
-import { 
-    COACHING_DEMO_QUESTION, 
-    DEMO_QUIZ_ANALYSIS, 
-    getPhaseConfig 
+import {
+    COACHING_DEMO_QUESTION,
+    DEMO_QUIZ_ANALYSIS,
+    getPhaseConfig
 } from './config';
 
 // 完整的题目选项数据
@@ -49,10 +49,10 @@ const FULL_QUIZ_OPTIONS = [
 ];
 
 export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { 
-        articleData, 
-        focusParagraphIndex, 
-        setFocusParagraph, 
+    const {
+        articleData,
+        focusParagraphIndex,
+        setFocusParagraph,
         coachingPhase,
         coachingTaskType,
         coachingTaskReceived,
@@ -65,18 +65,19 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         studentHighlights,
         highlights, // 实战阶段的做题痕迹
         addMessage,
-        messages
+        messages,
+        remoteStream
     } = useGameStore();
-    
+
     const [activeTab, setActiveTab] = useState<'article' | 'analysis'>('analysis');
     const [selectedText, setSelectedText] = useState<string | null>(null);
-    const [selectionInfo, setSelectionInfo] = useState<{top: number; left: number} | null>(null);
+    const [selectionInfo, setSelectionInfo] = useState<{ top: number; left: number } | null>(null);
     const [expandedQuestion, setExpandedQuestion] = useState<number | null>(2); // 默认展开错题
     const [jarvisAnalysis, setJarvisAnalysis] = useState<string | null>(null);
 
     // 当前阶段配置
     const currentPhaseConfig = getPhaseConfig(coachingPhase);
-    
+
     // 判断是否可以发布任务
     const canPublishTask = coachingPhase > 0 && !coachingTaskType;
 
@@ -162,9 +163,9 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     // 渲染文章段落（带高亮 - 包括实战阶段痕迹）
     const renderParagraphWithHighlights = (para: string, paraIndex: number) => {
         const isFocused = focusParagraphIndex === paraIndex;
-        
+
         let content: React.ReactNode = para;
-        
+
         // 1. 先渲染实战阶段的黄色高亮（做题痕迹）
         highlights.forEach(h => {
             if (para.includes(h.text)) {
@@ -214,18 +215,16 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         });
 
         return (
-            <div 
+            <div
                 key={paraIndex}
                 onClick={() => setFocusParagraph(isFocused ? null : paraIndex)}
-                className={`mb-4 p-4 rounded-xl cursor-pointer transition-all duration-300 border ${
-                    isFocused 
-                        ? 'bg-blue-50/50 border-[#00B4EE]/30 shadow-sm' 
+                className={`mb-4 p-4 rounded-xl cursor-pointer transition-all duration-300 border ${isFocused
+                        ? 'bg-blue-50/50 border-[#00B4EE]/30 shadow-sm'
                         : 'bg-transparent border-transparent hover:bg-slate-50'
-                }`}
+                    }`}
             >
-                <p className={`text-base leading-relaxed font-serif transition-colors ${
-                    isFocused ? 'text-slate-800 font-medium' : 'text-slate-500'
-                }`}>
+                <p className={`text-base leading-relaxed font-serif transition-colors ${isFocused ? 'text-slate-800 font-medium' : 'text-slate-500'
+                    }`}>
                     {content}
                 </p>
             </div>
@@ -240,17 +239,16 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                     const isStudentAnswer = opt.id === quiz.studentAnswer;
                     const isCorrect = opt.id === quiz.correctAnswer;
                     const optionIsCorrect = 'isCorrect' in opt ? opt.isCorrect : (opt.id === quiz.correctAnswer);
-                    
+
                     return (
-                        <div 
+                        <div
                             key={opt.id}
-                            className={`p-3 rounded-lg border flex justify-between items-center text-sm ${
-                                isStudentAnswer && !isCorrect
+                            className={`p-3 rounded-lg border flex justify-between items-center text-sm ${isStudentAnswer && !isCorrect
                                     ? 'bg-rose-50 border-rose-200 text-rose-700'
                                     : isCorrect
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                    : 'bg-slate-50 border-slate-100 text-slate-500'
-                            }`}
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                        : 'bg-slate-50 border-slate-100 text-slate-500'
+                                }`}
                         >
                             <div className="flex gap-2">
                                 <span className="font-bold">{opt.id}.</span>
@@ -273,33 +271,31 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         <main className="h-full w-full flex bg-gray-50 p-6 gap-6 overflow-hidden">
             {/* 左侧 70% - 文章 + 题目分析 */}
             <div className="flex-[7] bg-white rounded-3xl shadow-sm overflow-hidden flex flex-col"
-                 style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
-                
+                style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+
                 {/* 顶部Tab切换 */}
                 <div className="h-14 border-b border-slate-100 flex items-center px-6 bg-white gap-2 shrink-0">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('article')}
-                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${
-                            activeTab === 'article' 
-                                ? 'bg-slate-900 text-white border-slate-900' 
+                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'article'
+                                ? 'bg-slate-900 text-white border-slate-900'
                                 : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                        }`}
+                            }`}
                     >
                         <BookOpen size={16} />
                         原文
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('analysis')}
-                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${
-                            activeTab === 'analysis' 
-                                ? 'bg-slate-900 text-white border-slate-900' 
+                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'analysis'
+                                ? 'bg-slate-900 text-white border-slate-900'
                                 : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                        }`}
+                            }`}
                     >
                         <BarChart3 size={16} />
                         题目分析
                     </button>
-                    
+
                     {/* 实战痕迹提示 */}
                     {highlights.length > 0 && (
                         <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
@@ -307,7 +303,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         </span>
                     )}
                 </div>
-                
+
                 {/* 内容区域 */}
                 <div className="flex-1 overflow-y-auto p-6" onMouseUp={handleTeacherTextSelection}>
                     {activeTab === 'article' && (
@@ -316,7 +312,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 {articleData.title}
                             </h2>
                             {articleData.paragraphs.map((para, i) => renderParagraphWithHighlights(para, i))}
-                            
+
                             {/* Demo题目对应的文章内容 */}
                             <div className="mt-8 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
                                 <div className="text-xs font-bold text-amber-600 mb-2 uppercase tracking-wider">
@@ -324,8 +320,8 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 </div>
                                 <p className="text-base leading-relaxed font-serif text-slate-700">
                                     {COACHING_DEMO_QUESTION.article}
-                                        </p>
-                                    </div>
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -352,20 +348,19 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 {DEMO_QUIZ_ANALYSIS.map((item, idx) => {
                                     const fullQuiz = FULL_QUIZ_OPTIONS[idx];
                                     const isExpanded = expandedQuestion === item.questionId;
-                                    
-                                        return (
-                                        <div 
-                                            key={item.questionId} 
-                                            className={`rounded-2xl border-2 transition-all overflow-hidden ${
-                                                item.status === 'wrong' 
-                                                    ? 'bg-rose-50/50 border-rose-200' 
+
+                                    return (
+                                        <div
+                                            key={item.questionId}
+                                            className={`rounded-2xl border-2 transition-all overflow-hidden ${item.status === 'wrong'
+                                                    ? 'bg-rose-50/50 border-rose-200'
                                                     : item.status === 'guessed'
-                                                    ? 'bg-amber-50/50 border-amber-200'
-                                                    : 'bg-emerald-50/30 border-emerald-200'
-                                            }`}
+                                                        ? 'bg-amber-50/50 border-amber-200'
+                                                        : 'bg-emerald-50/30 border-emerald-200'
+                                                }`}
                                         >
                                             {/* 题目头部 - 可点击展开 */}
-                                            <div 
+                                            <div
                                                 className="p-4 cursor-pointer hover:bg-white/30 transition-colors"
                                                 onClick={() => setExpandedQuestion(isExpanded ? null : item.questionId)}
                                             >
@@ -379,22 +374,21 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                            item.status === 'wrong' 
-                                                                ? 'bg-rose-100 text-rose-700' 
+                                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'wrong'
+                                                                ? 'bg-rose-100 text-rose-700'
                                                                 : item.status === 'guessed'
-                                                                ? 'bg-amber-100 text-amber-700'
-                                                                : 'bg-emerald-100 text-emerald-700'
-                                                        }`}>
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                            }`}>
                                                             {item.status === 'wrong' ? '错误' : item.status === 'guessed' ? '蒙对' : '正确'}
                                                         </div>
-                                                        <ChevronDown 
-                                                            size={16} 
+                                                        <ChevronDown
+                                                            size={16}
                                                             className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                                         />
                                                     </div>
                                                 </div>
-                                                
+
                                                 {/* 简要答案对比 */}
                                                 <div className="flex items-center gap-4 text-sm mt-2 ml-11">
                                                     <span className="text-slate-500">
@@ -422,7 +416,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                                     >
                                                         <div className="p-4 pt-3">
                                                             {renderQuestionOptions(fullQuiz, item)}
-                                                            
+
                                                             {/* 错题纠正状态 */}
                                                             {item.status === 'wrong' && (
                                                                 <div className="mt-4 p-3 bg-rose-100/50 rounded-lg border border-rose-200">
@@ -450,7 +444,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             {/* 画线确认浮窗 */}
             <AnimatePresence>
                 {selectionInfo && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
@@ -467,7 +461,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
             {/* 右侧 30% - 重新设计布局：上方可滚动，聊天窗固定 */}
             <div className="flex-[3] flex flex-col h-full overflow-hidden">
-                
+
                 {/* 上方可滚动区域 */}
                 <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pb-2">
                     {/* 视频窗口 - 支持跨阶段平滑动画 */}
@@ -475,11 +469,12 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         layoutId="coach-video"
                         className="relative w-full shrink-0 rounded-xl shadow-md"
                         style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
+                        videoStream={remoteStream}
                     />
 
                     {/* Jarvis 助教 */}
                     <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl overflow-hidden shadow-sm"
-                         style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
                         <div className="px-4 py-3 border-b border-cyan-100 bg-white/50 flex items-center gap-2">
                             <Sparkles size={16} className="text-[#00B4EE]" />
                             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -515,8 +510,8 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                                     {currentPhaseConfig.jarvisAction}
                                                 </div>
                                             )}
-                    </div>
-                )}
+                                        </div>
+                                    )}
 
                                     {/* Jarvis 分析反馈 */}
                                     {jarvisAnalysis && (
@@ -531,7 +526,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                             )}
                         </div>
                     </div>
-                    
+
                     {/* 任务发布按钮 */}
                     <div className="space-y-2">
                         {coachingPhase === 0 ? (
@@ -546,7 +541,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         ) : (
                             <>
                                 {!coachingTaskType && (
-                                    <button 
+                                    <button
                                         onClick={handlePublishTask}
                                         disabled={!canPublishTask}
                                         className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -566,25 +561,24 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                                     {currentPhaseConfig?.name}
                                                 </span>
                                             </div>
-                                            <div className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                                coachingTaskCompleted 
-                                                    ? 'bg-emerald-100 text-emerald-700' 
+                                            <div className={`text-xs font-bold px-2 py-1 rounded-full ${coachingTaskCompleted
+                                                    ? 'bg-emerald-100 text-emerald-700'
                                                     : coachingTaskReceived
-                                                    ? 'bg-amber-100 text-amber-700'
-                                                    : 'bg-slate-100 text-slate-500'
-                                            }`}>
-                                                {coachingTaskCompleted 
-                                                    ? '✓ 已完成' 
-                                                    : coachingTaskReceived 
-                                                    ? '进行中...' 
-                                                    : '等待接收'}
+                                                        ? 'bg-amber-100 text-amber-700'
+                                                        : 'bg-slate-100 text-slate-500'
+                                                }`}>
+                                                {coachingTaskCompleted
+                                                    ? '✓ 已完成'
+                                                    : coachingTaskReceived
+                                                        ? '进行中...'
+                                                        : '等待接收'}
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
                                 {coachingTaskCompleted && coachingPhase < 6 && (
-                                    <button 
+                                    <button
                                         onClick={handleNextPhase}
                                         className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 transition-all"
                                     >
@@ -607,15 +601,14 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         {coachingPhase > 0 && (
                             <div className="flex justify-center gap-1.5 pt-2">
                                 {[1, 2, 3, 4, 5, 6].map(i => (
-                                    <div 
+                                    <div
                                         key={i}
-                                        className={`w-2 h-2 rounded-full transition-all ${
-                                            i < coachingPhase 
-                                                ? 'bg-emerald-500' 
-                                                : i === coachingPhase 
-                                                ? 'bg-[#00B4EE] scale-125' 
-                                                : 'bg-slate-200'
-                                        }`}
+                                        className={`w-2 h-2 rounded-full transition-all ${i < coachingPhase
+                                                ? 'bg-emerald-500'
+                                                : i === coachingPhase
+                                                    ? 'bg-[#00B4EE] scale-125'
+                                                    : 'bg-slate-200'
+                                            }`}
                                     />
                                 ))}
                             </div>
@@ -626,7 +619,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                 {/* 聊天窗 - 固定高度 */}
                 <div className="h-64 shrink-0 mt-2">
                     <div className="flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm h-full"
-                         style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
                         <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                 CHAT LOG
@@ -649,7 +642,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                             </div>
                                         </div>
                                     ))}
-                                    
+
                                     {/* 普通消息 */}
                                     {messages.slice(-5).map((msg) => (
                                         <div
@@ -657,17 +650,16 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                             className={`flex ${msg.role === 'coach' ? 'justify-end' : 'justify-start'}`}
                                         >
                                             <div
-                                                className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
-                                                    msg.role === 'coach'
+                                                className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'coach'
                                                         ? 'bg-[#00B4EE] text-white'
                                                         : msg.role === 'jarvis'
-                                                        ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
-                                                        : 'bg-slate-100 text-slate-700'
-                                                }`}
+                                                            ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
+                                                            : 'bg-slate-100 text-slate-700'
+                                                    }`}
                                             >
                                                 <div className="text-[10px] opacity-60 mb-0.5 font-semibold">
-                                                    {msg.role === 'jarvis' ? 'Jarvis' : 
-                                                     msg.role === 'coach' ? 'You' : 'Alex'}
+                                                    {msg.role === 'jarvis' ? 'Jarvis' :
+                                                        msg.role === 'coach' ? 'You' : 'Alex'}
                                                 </div>
                                                 {msg.text}
                                             </div>

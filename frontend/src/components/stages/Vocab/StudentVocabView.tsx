@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore, VocabItem } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
-    Volume2, Mic, RotateCw, CheckCircle2, ArrowRight, 
+import {
+    Volume2, Mic, RotateCw, CheckCircle2, ArrowRight,
     Clock, Trophy, ListChecks, Check, Sparkles, Lightbulb, RefreshCcw
 } from 'lucide-react';
 
@@ -13,16 +13,16 @@ import {
  * 包含闪卡、录音、回炉和出口测试多个环节
  */
 export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { 
-        vocabList, 
-        currentVocabIndex, 
-        phase4Step, 
-        exitPassStep, 
-        remedialQueue, 
-        remedialIndex, 
-        vocabCardFlipped, 
-        setVocabCardFlipped, 
-        nextVocabCard, 
+    const {
+        vocabList,
+        currentVocabIndex,
+        phase4Step,
+        exitPassStep,
+        remedialQueue,
+        remedialIndex,
+        vocabCardFlipped,
+        setVocabCardFlipped,
+        nextVocabCard,
         vocabStatus,
         setReviewingVocabWord,
         reviewingVocabWord,
@@ -32,7 +32,8 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         isPlayingAudio,
         playStandardAudio,
         completeRemedialWord,
-        vocabSpeakEnabled 
+        vocabSpeakEnabled,
+        remoteStream
     } = useGameStore();
 
     let currentCard: VocabItem | undefined;
@@ -68,14 +69,14 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
 
     const handleRecordStart = (e: React.SyntheticEvent) => {
         e.preventDefault();
-        if (recordingState === 'finished') return; 
+        if (recordingState === 'finished') return;
         setRecordingState('recording');
     };
 
     const handleRecordEnd = (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (recordingState !== 'recording') return;
-        
+
         setRecordingState('playing_user');
         setTimeout(() => {
             setRecordingState('playing_standard');
@@ -83,9 +84,9 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 const mockScore = 85 + Math.floor(Math.random() * 11);
                 setScore(mockScore);
                 setRecordingState('finished');
-                setVocabCardFlipped(true); 
-            }, 1500); 
-        }, 1500); 
+                setVocabCardFlipped(true);
+            }, 1500);
+        }, 1500);
     };
 
     const syllableColors = [
@@ -106,7 +107,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     <div className="absolute bottom-20 left-1/4 text-4xl animate-bounce delay-500">🏆</div>
                 </div>
 
-                <motion.div 
+                <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100 max-w-lg w-full relative z-10"
@@ -116,8 +117,8 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     </div>
                     <h1 className="text-4xl font-bold text-slate-900 mb-4">学习完成！</h1>
                     <p className="text-slate-500 text-lg mb-8">你已经掌握了本节课的所有生词。</p>
-                    
-                    <button 
+
+                    <button
                         onClick={() => setStage('surgery')}
                         className="w-full py-5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2"
                     >
@@ -132,29 +133,29 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
     // 闪卡模式或回炉模式
     if (currentCard && (phase4Step === 'flashcards' || (phase4Step === 'exitpass' && exitPassStep === 'remedial'))) {
         return (
-            <div 
+            <div
                 className="flex h-full w-full relative overflow-hidden flex-col items-center justify-center"
                 style={{
                     background: 'linear-gradient(135deg, rgba(0, 180, 238, 0.08) 0%, rgba(0, 180, 238, 0.12) 40%, rgba(253, 231, 0, 0.1) 70%, rgba(253, 231, 0, 0.15) 100%)'
                 }}
             >
-                
+
                 {/* 复习弹窗 */}
                 <AnimatePresence>
                     {reviewingVocabWord && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-8"
                             onClick={() => setReviewingVocabWord(null)}
                         >
-                            <motion.div 
+                            <motion.div
                                 initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
                                 onClick={e => e.stopPropagation()}
                                 className="w-full max-w-lg bg-white rounded-[2rem] shadow-2xl overflow-hidden p-8"
                             >
                                 <h3 className="text-3xl font-serif font-bold text-slate-900 mb-2">{reviewingVocabWord}</h3>
                                 <p className="text-slate-500 mb-6">{vocabList.find(v => v.word === reviewingVocabWord)?.definition}</p>
-                                <button 
+                                <button
                                     onClick={() => setReviewingVocabWord(null)}
                                     className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
                                 >
@@ -170,17 +171,18 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     layoutId="student-video"
                     className="absolute top-6 right-6 w-64 z-[60] rounded-xl shadow-2xl"
                     placeholderText="老师连线中..."
+                    videoStream={remoteStream}
                 />
 
                 {/* 单词卡片 */}
-                <motion.div 
+                <motion.div
                     key={cardKey}
                     initial={{ opacity: 0, x: 100 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ type: "spring", duration: 0.5 }}
                     className="w-full max-w-2xl"
                 >
-                    <div 
+                    <div
                         className="bg-white rounded-[2rem] shadow-2xl overflow-hidden h-[32rem] flex flex-col"
                         style={{ border: '2px solid rgba(0, 180, 238, 0.25)' }}
                     >
@@ -193,7 +195,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                         {currentCard.syllables.map((syl, i) => {
                                             const colorScheme = syllableColors[i % syllableColors.length];
                                             return (
-                                                <motion.span 
+                                                <motion.span
                                                     key={i}
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
@@ -208,13 +210,12 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                 ) : (
                                     <h2 className="text-6xl font-serif font-bold text-slate-900">{currentCard.word}</h2>
                                 )}
-                                
-                                <button 
+
+                                <button
                                     onClick={() => playStandardAudio()}
                                     disabled={recordingState === 'playing_standard'}
-                                    className={`p-4 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 ${
-                                        recordingState === 'playing_standard' ? 'animate-pulse' : ''
-                                    }`}
+                                    className={`p-4 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 ${recordingState === 'playing_standard' ? 'animate-pulse' : ''
+                                        }`}
                                 >
                                     <Volume2 size={28} className="text-slate-600" />
                                 </button>
@@ -287,9 +288,9 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
 
                         {/* 录音按钮 - 固定在卡片底部区域 */}
                         {!isRemedialMode && (
-                            <div 
+                            <div
                                 className="shrink-0 py-6 flex justify-center"
-                                style={{ 
+                                style={{
                                     background: 'linear-gradient(180deg, rgba(0, 180, 238, 0.06) 0%, rgba(0, 180, 238, 0.12) 100%)',
                                     borderTop: '1px solid rgba(0, 180, 238, 0.2)'
                                 }}
@@ -299,15 +300,14 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                     onPointerUp={handleRecordEnd}
                                     onPointerLeave={handleRecordEnd}
                                     disabled={!vocabSpeakEnabled || recordingState === 'finished'}
-                                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-                                        !vocabSpeakEnabled
-                                        ? 'bg-slate-300 cursor-not-allowed shadow-md'
-                                        : recordingState === 'recording' 
-                                        ? 'bg-red-500 shadow-xl shadow-red-500/40 scale-110' 
-                                        : recordingState === 'finished'
-                                        ? 'bg-emerald-500 shadow-xl shadow-emerald-500/40'
-                                        : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-xl'
-                                    }`}
+                                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${!vocabSpeakEnabled
+                                            ? 'bg-slate-300 cursor-not-allowed shadow-md'
+                                            : recordingState === 'recording'
+                                                ? 'bg-red-500 shadow-xl shadow-red-500/40 scale-110'
+                                                : recordingState === 'finished'
+                                                    ? 'bg-emerald-500 shadow-xl shadow-emerald-500/40'
+                                                    : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-xl'
+                                        }`}
                                 >
                                     <Mic size={28} className="text-white" />
                                 </button>
@@ -320,7 +320,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 {isRemedialMode && (
                     <div className="absolute bottom-8 left-0 w-full flex justify-center z-30">
                         {!vocabCardFlipped ? (
-                            <button 
+                            <button
                                 onClick={() => setVocabCardFlipped(true)}
                                 className="px-10 py-4 rounded-full bg-slate-900 text-white font-bold text-lg shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                             >
@@ -328,7 +328,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                 <span>查看单词</span>
                             </button>
                         ) : (
-                            <motion.button 
+                            <motion.button
                                 initial={{ scale: 0.9, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 onClick={completeRemedialWord}
@@ -340,7 +340,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                         )}
                     </div>
                 )}
-                
+
                 {/* 录音状态提示 - 简化显示 */}
                 {!isRemedialMode && recordingState !== 'idle' && recordingState !== 'finished' && (
                     <div className="absolute bottom-8 left-0 w-full flex justify-center z-20">
@@ -351,19 +351,18 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                         </div>
                     </div>
                 )}
-                
+
                 {/* 录音完成后显示分数徽章 */}
                 {!isRemedialMode && recordingState === 'finished' && score && (
-                    <motion.div 
+                    <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="absolute bottom-8 left-0 w-full flex justify-center z-20"
                     >
-                        <div className={`px-8 py-3 rounded-full font-bold text-lg shadow-xl flex items-center gap-3 ${
-                            score >= 80 
-                                ? 'bg-emerald-500 text-white' 
+                        <div className={`px-8 py-3 rounded-full font-bold text-lg shadow-xl flex items-center gap-3 ${score >= 80
+                                ? 'bg-emerald-500 text-white'
                                 : 'bg-amber-500 text-white'
-                        }`}>
+                            }`}>
                             {score >= 80 ? '🎉' : '💪'} 得分: {score}
                         </div>
                     </motion.div>
@@ -387,16 +386,15 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     {vocabList.map((item, i) => {
                         const isMastered = vocabStatus[item.word] === 'mastered';
                         return (
-                            <motion.div 
+                            <motion.div
                                 key={item.word}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.1 }}
-                                className={`group flex items-center justify-between p-6 rounded-2xl border transition-all ${
-                                    isMastered 
-                                    ? 'bg-emerald-50/50 border-emerald-100 shadow-none' 
-                                    : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200'
-                                }`}
+                                className={`group flex items-center justify-between p-6 rounded-2xl border transition-all ${isMastered
+                                        ? 'bg-emerald-50/50 border-emerald-100 shadow-none'
+                                        : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200'
+                                    }`}
                             >
                                 <div className="flex-1 flex items-center gap-6">
                                     <div className={`text-2xl font-serif font-bold transition-all ${isMastered ? 'text-slate-800' : 'text-slate-800'}`}>
@@ -412,12 +410,11 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                     )}
                                 </div>
 
-                                <div 
-                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all pointer-events-none ${
-                                        isMastered 
-                                        ? 'bg-emerald-500 border-emerald-500 text-white scale-110 shadow-lg shadow-emerald-200' 
-                                        : 'bg-slate-50 border-slate-200 text-transparent'
-                                    }`}
+                                <div
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all pointer-events-none ${isMastered
+                                            ? 'bg-emerald-500 border-emerald-500 text-white scale-110 shadow-lg shadow-emerald-200'
+                                            : 'bg-slate-50 border-slate-200 text-transparent'
+                                        }`}
                                 >
                                     <Check size={24} strokeWidth={3} />
                                 </div>
@@ -435,7 +432,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
             </div>
         );
     }
-    
+
     // Fallback: 回炉模式但卡片未加载
     if (phase4Step === 'exitpass' && exitPassStep === 'remedial') {
         return (
@@ -448,7 +445,7 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
             </div>
         );
     }
-    
+
     return null;
 }
 

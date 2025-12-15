@@ -88,7 +88,7 @@ interface GameStore {
   coachingStep: 1 | 2;
   activeTask: 'highlight' | 'speak' | null;
   stuckCount: number;
-  
+
   // 6步教学阶段状态
   coachingPhase: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0=未开始, 1-6=6个阶段
   coachingTaskType: 'highlight' | 'voice' | 'select' | 'gps' | 'review' | null; // 当前任务类型
@@ -122,7 +122,7 @@ interface GameStore {
   studentHasEquipped: boolean;
   studentConfirmedFormula: boolean; // 学生是否确认了口诀
   studentDemoStep: number; // 学生完成的演示步骤 (0=未开始, 1=完成圈路标, 2=完成搜原句, 3=完成锁答案)
-  
+
   // Skill Quiz State (Verify Phase - 5 questions)
   skillQuizHighlightedWords: string[];
   skillQuizSelectedAnswer: string | null;
@@ -140,7 +140,7 @@ interface GameStore {
   setViewMode: (mode: ViewMode) => void;
   addMessage: (message: Omit<Message, 'id' | 'time'>) => void;
   setQuickReplies: (replies: string[]) => void;
-  
+
   // Battle Actions
   addLookup: (word: string) => void;
   addHighlight: (text: string) => void;
@@ -156,7 +156,7 @@ interface GameStore {
   resolveTask: () => void;
   incrementStuck: () => void;
   forceNextStep: () => void;
-  
+
   // 6步教学 Actions
   advanceCoachingPhase: () => void; // 教师推进到下一阶段
   setCoachingPhase: (phase: 0 | 1 | 2 | 3 | 4 | 5 | 6) => void;
@@ -168,7 +168,7 @@ interface GameStore {
   receiveGpsCard: () => void;
   setStudentVoiceAnswer: (answer: string | null) => void;
   resetCoachingState: () => void;
-  
+
   // Vocab Actions
   initVocabSession: () => void;
   nextVocabCard: () => void;
@@ -193,7 +193,7 @@ interface GameStore {
   setStudentConfirmedFormula: (confirmed: boolean) => void;
   setStudentDemoStep: (step: number) => void;
   resetSkillState: () => void;
-  
+
   // Skill Quiz Actions
   toggleSkillQuizWord: (word: string) => void;
   setSkillQuizAnswer: (answerId: string, isCorrect: boolean) => void;
@@ -203,6 +203,10 @@ interface GameStore {
   resetQuiz: () => void; // 重置答题状态
   setSkillQuizWrongAttempt: (attempt: { questionId: number; optionId: string } | null) => void; // 设置错误尝试
   setDemoTeacherStep: (step: number) => void; // 老师推进演示步骤
+
+  // Video State
+  remoteStream: MediaStream | null;
+  setRemoteStream: (stream: MediaStream | null) => void;
 
   reset: () => void;
 }
@@ -256,71 +260,71 @@ const MOCK_ARTICLE = {
 const REQUIRED_VOCAB = ['obsessed', 'unprecedented', 'determination', 'perseverance', 'comprehensive'];
 
 const MOCK_VOCAB_DB: Record<string, VocabItem> = {
-  'obsessed': { 
-      word: 'obsessed', 
-      syllables: ['ob', 'sessed'], 
-      definition: 'adj. 着迷的；无法摆脱的', 
-      contextSentence: 'He became obsessed with winning every game.',
-      mnemonic: '💡 巧记：Ob (Oh) + sessed (Possessed) -> "Oh, possessed by the idea!" 被念头附身了 -> 着迷。',
-      audioSrc: '' 
+  'obsessed': {
+    word: 'obsessed',
+    syllables: ['ob', 'sessed'],
+    definition: 'adj. 着迷的；无法摆脱的',
+    contextSentence: 'He became obsessed with winning every game.',
+    mnemonic: '💡 巧记：Ob (Oh) + sessed (Possessed) -> "Oh, possessed by the idea!" 被念头附身了 -> 着迷。',
+    audioSrc: ''
   },
-  'unprecedented': { 
-      word: 'unprecedented', 
-      syllables: ['un', 'prec', 'e', 'dent', 'ed'], 
-      definition: 'adj. 前所未有的', 
-      contextSentence: 'The team faced unprecedented challenges this season.',
-      mnemonic: '💡 巧记：Un (不) + Precedent (先例) = 没有先例的 = 史无前例。',
-      audioSrc: '' 
+  'unprecedented': {
+    word: 'unprecedented',
+    syllables: ['un', 'prec', 'e', 'dent', 'ed'],
+    definition: 'adj. 前所未有的',
+    contextSentence: 'The team faced unprecedented challenges this season.',
+    mnemonic: '💡 巧记：Un (不) + Precedent (先例) = 没有先例的 = 史无前例。',
+    audioSrc: ''
   },
-  'determination': { 
-      word: 'determination', 
-      syllables: ['de', 'ter', 'mi', 'na', 'tion'], 
-      definition: 'n. 决心；果断', 
-      contextSentence: 'Her determination to improve impressed the coach.',
-      mnemonic: '💡 巧记：De-ter-mi-na-tion, 每个音节都铿锵有力，代表着不可动摇的"决心"！',
-      audioSrc: '' 
+  'determination': {
+    word: 'determination',
+    syllables: ['de', 'ter', 'mi', 'na', 'tion'],
+    definition: 'n. 决心；果断',
+    contextSentence: 'Her determination to improve impressed the coach.',
+    mnemonic: '💡 巧记：De-ter-mi-na-tion, 每个音节都铿锵有力，代表着不可动摇的"决心"！',
+    audioSrc: ''
   },
-  'perseverance': { 
-      word: 'perseverance', 
-      syllables: ['per', 'se', 'ver', 'ance'], 
-      definition: 'n. 毅力；不屈不挠', 
-      contextSentence: 'Success requires patience and perseverance.',
-      mnemonic: '💡 巧记：Per (始终) + severe (严厉) -> 始终对自己要求严厉 -> 毅力。',
-      audioSrc: '' 
+  'perseverance': {
+    word: 'perseverance',
+    syllables: ['per', 'se', 'ver', 'ance'],
+    definition: 'n. 毅力；不屈不挠',
+    contextSentence: 'Success requires patience and perseverance.',
+    mnemonic: '💡 巧记：Per (始终) + severe (严厉) -> 始终对自己要求严厉 -> 毅力。',
+    audioSrc: ''
   },
-  'comprehensive': { 
-      word: 'comprehensive', 
-      syllables: ['com', 'pre', 'hen', 'sive'], 
-      definition: 'adj. 全面的；综合的', 
-      contextSentence: 'They offer a comprehensive training program.',
-      mnemonic: '💡 巧记：Com (共同) + prehend (抓住/理解) -> 把所有的方面都抓住了 -> 全面的。',
-      audioSrc: '' 
+  'comprehensive': {
+    word: 'comprehensive',
+    syllables: ['com', 'pre', 'hen', 'sive'],
+    definition: 'adj. 全面的；综合的',
+    contextSentence: 'They offer a comprehensive training program.',
+    mnemonic: '💡 巧记：Com (共同) + prehend (抓住/理解) -> 把所有的方面都抓住了 -> 全面的。',
+    audioSrc: ''
   },
-  'default': { 
-      word: 'Unknown', 
-      syllables: ['un', 'known'], 
-      definition: 'n. 未知词汇 (Mock Data)', 
-      contextSentence: 'This word was looked up during the session.',
-      mnemonic: '💡 Jarvis is analyzing this word for you...',
-      audioSrc: ''
+  'default': {
+    word: 'Unknown',
+    syllables: ['un', 'known'],
+    definition: 'n. 未知词汇 (Mock Data)',
+    contextSentence: 'This word was looked up during the session.',
+    mnemonic: '💡 Jarvis is analyzing this word for you...',
+    audioSrc: ''
   }
 };
 
 const INITIAL_SURGERY_CHUNKS: SentenceChunk[] = [
-    { id: 'c1', text: 'The coach', type: 'core', isRemoved: false },
-    { id: 'm1', text: 'that trained our team for three years', type: 'modifier', isRemoved: false },
-    { id: 'c2', text: 'won', type: 'core', isRemoved: false },
-    { id: 'm2', text: 'many national', type: 'modifier', isRemoved: false },
-    { id: 'c3', text: 'awards.', type: 'core', isRemoved: false }
+  { id: 'c1', text: 'The coach', type: 'core', isRemoved: false },
+  { id: 'm1', text: 'that trained our team for three years', type: 'modifier', isRemoved: false },
+  { id: 'c2', text: 'won', type: 'core', isRemoved: false },
+  { id: 'm2', text: 'many national', type: 'modifier', isRemoved: false },
+  { id: 'c3', text: 'awards.', type: 'core', isRemoved: false }
 ];
 
 const generateVocabItem = (word: string): VocabItem => {
   const lower = word.toLowerCase().replace(/[^a-z]/g, '');
   if (MOCK_VOCAB_DB[lower]) return MOCK_VOCAB_DB[lower];
-  
+
   return {
     word: word,
-    syllables: [word.substring(0, Math.ceil(word.length/2)), word.substring(Math.ceil(word.length/2))],
+    syllables: [word.substring(0, Math.ceil(word.length / 2)), word.substring(Math.ceil(word.length / 2))],
     definition: `n. ${word} 的中文释义 (Mock)`,
     contextSentence: `Here is a context sentence containing the word ${word}.`,
     mnemonic: `💡 Jarvis smart mnemonic for ${word}...`,
@@ -334,7 +338,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   viewMode: 'student',
   messages: [],
   quickReplies: [],
-  
+
   // Battle Defaults
   lookupLimit: 3,
   lookups: [],
@@ -350,7 +354,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   coachingStep: 1,
   activeTask: null,
   stuckCount: 0,
-  
+
   // 6步教学默认值
   coachingPhase: 0,
   coachingTaskType: null,
@@ -396,10 +400,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setUserRole: (role) => set({ userRole: role, viewMode: role === 'coach' ? 'coach' : 'student' }),
   setStage: (stage) => {
-      set({ currentStage: stage });
-      if (stage === 'vocab') {
-          get().initVocabSession();
-      }
+    set({ currentStage: stage });
+    if (stage === 'vocab') {
+      get().initVocabSession();
+    }
   },
   setViewMode: (mode) => set({ viewMode: mode }),
   addMessage: (msg) => set((state) => ({
@@ -410,7 +414,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }]
   })),
   setQuickReplies: (replies) => set({ quickReplies: replies }),
-  
+
   addLookup: (word) => set((state) => {
     if (state.currentStage !== 'coaching' && (state.lookups.length >= state.lookupLimit || state.lookups.includes(word))) {
       return state;
@@ -426,9 +430,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setQuizAnswer: (qId, oId, isUnsure) => set((state) => {
     const existing = state.quizAnswers.find(a => a.questionId === qId);
     if (existing) {
-       return {
-         quizAnswers: state.quizAnswers.map(a => a.questionId === qId ? { ...a, optionId: oId, isUnsure } : a)
-       };
+      return {
+        quizAnswers: state.quizAnswers.map(a => a.questionId === qId ? { ...a, optionId: oId, isUnsure } : a)
+      };
     }
     return { quizAnswers: [...state.quizAnswers, { questionId: qId, optionId: oId, isUnsure }] };
   }),
@@ -437,16 +441,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setFocusParagraph: (index) => set({ focusParagraphIndex: index }),
   setIsRecording: (isRecording) => set({ isRecording }),
   setCurrentCorrectionQuestionId: (id) => set({ currentCorrectionQuestionId: id }),
-  
+
   pushTask: (task) => set({ activeTask: task }),
   resolveTask: () => set((state) => ({ activeTask: null, coachingStep: state.coachingStep === 1 ? 2 : state.coachingStep })),
   incrementStuck: () => set((state) => ({ stuckCount: state.stuckCount + 1 })),
-  forceNextStep: () => set((state) => ({ 
-    stuckCount: 0, 
+  forceNextStep: () => set((state) => ({
+    stuckCount: 0,
     activeTask: null,
-    coachingStep: state.coachingStep === 1 ? 2 : state.coachingStep 
+    coachingStep: state.coachingStep === 1 ? 2 : state.coachingStep
   })),
-  
+
   // 6步教学 Actions
   advanceCoachingPhase: () => set((state) => ({
     coachingPhase: Math.min(state.coachingPhase + 1, 6) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
@@ -454,16 +458,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     coachingTaskReceived: false,
     coachingTaskCompleted: false
   })),
-  setCoachingPhase: (phase) => set({ 
+  setCoachingPhase: (phase) => set({
     coachingPhase: phase,
     coachingTaskType: null,
     coachingTaskReceived: false,
     coachingTaskCompleted: false
   }),
-  publishCoachingTask: (type) => set({ 
-    coachingTaskType: type, 
+  publishCoachingTask: (type) => set({
+    coachingTaskType: type,
     coachingTaskReceived: false,
-    coachingTaskCompleted: false 
+    coachingTaskCompleted: false
   }),
   receiveCoachingTask: () => set({ coachingTaskReceived: true }),
   completeCoachingTask: () => set({ coachingTaskCompleted: true }),
@@ -488,218 +492,218 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Vocab Actions
   initVocabSession: () => set((state) => {
-      const allWords = Array.from(new Set([...REQUIRED_VOCAB, ...state.lookups]));
-      const vocabList = allWords.map(generateVocabItem);
-      const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
-      vocabList.forEach(v => vocabStatus[v.word] = 'unseen'); // Start all as unseen (or needs_review logic)
-      
-      return {
-          vocabList,
-          vocabStatus,
-          currentVocabIndex: 0,
-          phase4Step: 'flashcards',
-          exitPassStep: 'check',
-          remedialQueue: [],
-          remedialIndex: 0,
-          vocabCardFlipped: false,
-          isSyllableMode: false,
-          isPlayingAudio: 'none',
-          vocabSpeakEnabled: false
-      };
+    const allWords = Array.from(new Set([...REQUIRED_VOCAB, ...state.lookups]));
+    const vocabList = allWords.map(generateVocabItem);
+    const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
+    vocabList.forEach(v => vocabStatus[v.word] = 'unseen'); // Start all as unseen (or needs_review logic)
+
+    return {
+      vocabList,
+      vocabStatus,
+      currentVocabIndex: 0,
+      phase4Step: 'flashcards',
+      exitPassStep: 'check',
+      remedialQueue: [],
+      remedialIndex: 0,
+      vocabCardFlipped: false,
+      isSyllableMode: false,
+      isPlayingAudio: 'none',
+      vocabSpeakEnabled: false
+    };
   }),
   nextVocabCard: () => set((state) => {
-      const nextIndex = state.currentVocabIndex + 1;
-      if (nextIndex >= state.vocabList.length) {
-          // Transition to Exit Pass Step 1: Check
-          return { 
-              phase4Step: 'exitpass', 
-              exitPassStep: 'check',
-              vocabCardFlipped: false,
-              isSyllableMode: false,
-              isPlayingAudio: 'none',
-              vocabSpeakEnabled: false
-          };
-      }
-      return { 
-          currentVocabIndex: nextIndex, 
-          vocabCardFlipped: false,
-          isSyllableMode: false,
-          isPlayingAudio: 'none',
-          vocabSpeakEnabled: false
+    const nextIndex = state.currentVocabIndex + 1;
+    if (nextIndex >= state.vocabList.length) {
+      // Transition to Exit Pass Step 1: Check
+      return {
+        phase4Step: 'exitpass',
+        exitPassStep: 'check',
+        vocabCardFlipped: false,
+        isSyllableMode: false,
+        isPlayingAudio: 'none',
+        vocabSpeakEnabled: false
       };
+    }
+    return {
+      currentVocabIndex: nextIndex,
+      vocabCardFlipped: false,
+      isSyllableMode: false,
+      isPlayingAudio: 'none',
+      vocabSpeakEnabled: false
+    };
   }),
   setVocabCardFlipped: (flipped) => set({ vocabCardFlipped: flipped }),
   toggleSyllableMode: () => set((state) => ({ isSyllableMode: !state.isSyllableMode })),
   playStandardAudio: () => {
     set({ isPlayingAudio: 'standard' });
     setTimeout(() => {
-        set({ isPlayingAudio: 'none' });
+      set({ isPlayingAudio: 'none' });
     }, 2000);
   },
-  
+
   toggleVocabCheck: (word) => set((state) => {
-      const current = state.vocabStatus[word];
-      const next = current === 'mastered' ? 'learning' : 'mastered';
-      return { vocabStatus: { ...state.vocabStatus, [word]: next } };
+    const current = state.vocabStatus[word];
+    const next = current === 'mastered' ? 'learning' : 'mastered';
+    return { vocabStatus: { ...state.vocabStatus, [word]: next } };
   }),
 
   submitExitPass: () => set((state) => {
-      const unmastered = state.vocabList.filter(v => state.vocabStatus[v.word] !== 'mastered');
-      
-      if (unmastered.length === 0) {
-          // 全部掌握，直接跳转到难句阶段
-          return { currentStage: 'surgery', exitPassStep: 'check', phase4Step: 'flashcards' };
-      } else {
-          return {
-              exitPassStep: 'remedial',
-              remedialQueue: unmastered.map(v => v.word),
-              remedialIndex: 0,
-              vocabCardFlipped: false,
-              isSyllableMode: false
-          };
-      }
+    const unmastered = state.vocabList.filter(v => state.vocabStatus[v.word] !== 'mastered');
+
+    if (unmastered.length === 0) {
+      // 全部掌握，直接跳转到难句阶段
+      return { currentStage: 'surgery', exitPassStep: 'check', phase4Step: 'flashcards' };
+    } else {
+      return {
+        exitPassStep: 'remedial',
+        remedialQueue: unmastered.map(v => v.word),
+        remedialIndex: 0,
+        vocabCardFlipped: false,
+        isSyllableMode: false
+      };
+    }
   }),
 
   completeRemedialWord: () => set((state) => {
-      const currentWord = state.remedialQueue[state.remedialIndex];
-      // Mark as mastered
-      const newStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = { ...state.vocabStatus, [currentWord]: 'mastered' };
+    const currentWord = state.remedialQueue[state.remedialIndex];
+    // Mark as mastered
+    const newStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = { ...state.vocabStatus, [currentWord]: 'mastered' };
 
-      const nextIndex = state.remedialIndex + 1;
-      if (nextIndex >= state.remedialQueue.length) {
-          // 回炉学习全部完成，直接跳转到难句阶段
-          return { 
-              vocabStatus: newStatus, 
-              currentStage: 'surgery', 
-              exitPassStep: 'check', 
-              phase4Step: 'flashcards',
-              remedialQueue: [] 
-          };
-      } else {
-          // Next remedial card
-          return { vocabStatus: newStatus, remedialIndex: nextIndex, vocabCardFlipped: false, isSyllableMode: false };
-      }
+    const nextIndex = state.remedialIndex + 1;
+    if (nextIndex >= state.remedialQueue.length) {
+      // 回炉学习全部完成，直接跳转到难句阶段
+      return {
+        vocabStatus: newStatus,
+        currentStage: 'surgery',
+        exitPassStep: 'check',
+        phase4Step: 'flashcards',
+        remedialQueue: []
+      };
+    } else {
+      // Next remedial card
+      return { vocabStatus: newStatus, remedialIndex: nextIndex, vocabCardFlipped: false, isSyllableMode: false };
+    }
   }),
 
   setReviewingVocabWord: (word) => set({ reviewingVocabWord: word }),
 
   // Surgery Actions
   setSurgeryMode: (mode) => set({ surgeryMode: mode }),
-  
+
   removeChunk: (id) => set((state) => ({
-      surgeryChunks: state.surgeryChunks.map(c => 
-          c.id === id ? { ...c, isRemoved: true } : c
-      )
+    surgeryChunks: state.surgeryChunks.map(c =>
+      c.id === id ? { ...c, isRemoved: true } : c
+    )
   })),
 
   restoreChunk: (id) => set((state) => ({
-      surgeryChunks: state.surgeryChunks.map(c => 
-          c.id === id ? { ...c, isRemoved: false } : c
-      )
+    surgeryChunks: state.surgeryChunks.map(c =>
+      c.id === id ? { ...c, isRemoved: false } : c
+    )
   })),
 
   restoreSentence: () => set((state) => ({
-      surgeryChunks: state.surgeryChunks.map(c => ({ ...c, isRemoved: false }))
+    surgeryChunks: state.surgeryChunks.map(c => ({ ...c, isRemoved: false }))
   })),
 
   triggerChunkShake: (id) => {
+    set((state) => ({
+      surgeryChunks: state.surgeryChunks.map(c =>
+        c.id === id ? { ...c, shake: true } : c
+      )
+    }));
+    setTimeout(() => {
       set((state) => ({
-          surgeryChunks: state.surgeryChunks.map(c => 
-              c.id === id ? { ...c, shake: true } : c
-          )
+        surgeryChunks: state.surgeryChunks.map(c =>
+          c.id === id ? { ...c, shake: false } : c
+        )
       }));
-      setTimeout(() => {
-          set((state) => ({
-              surgeryChunks: state.surgeryChunks.map(c => 
-                  c.id === id ? { ...c, shake: false } : c
-              )
-          }));
-      }, 500);
+    }, 500);
   },
 
   // Skill Actions
-  advanceSkillNode: () => set((state) => ({ 
-      skillNode: Math.min(state.skillNode + 1, 5) 
+  advanceSkillNode: () => set((state) => ({
+    skillNode: Math.min(state.skillNode + 1, 5)
   })),
   setStudentEquipped: (equipped) => set({ studentHasEquipped: equipped }),
   setStudentConfirmedFormula: (confirmed) => set({ studentConfirmedFormula: confirmed }),
   setStudentDemoStep: (step) => set({ studentDemoStep: step }),
-  resetSkillState: () => set({ 
-      skillNode: 0, 
-      studentHasEquipped: false,
-      studentConfirmedFormula: false,
-      studentDemoStep: 0,
-      skillQuizHighlightedWords: [],
-      skillQuizSelectedAnswer: null,
-      skillQuizAnswerCorrect: null,
-      skillQuizStartTime: null,
-      currentQuizIndex: 0,
-      quizResults: [],
-      quizCompleted: false,
-      skillQuizWrongAttempt: null,
-      demoTeacherStep: 0
+  resetSkillState: () => set({
+    skillNode: 0,
+    studentHasEquipped: false,
+    studentConfirmedFormula: false,
+    studentDemoStep: 0,
+    skillQuizHighlightedWords: [],
+    skillQuizSelectedAnswer: null,
+    skillQuizAnswerCorrect: null,
+    skillQuizStartTime: null,
+    currentQuizIndex: 0,
+    quizResults: [],
+    quizCompleted: false,
+    skillQuizWrongAttempt: null,
+    demoTeacherStep: 0
   }),
-  
+
   // Skill Quiz Actions
   toggleSkillQuizWord: (word) => set((state) => {
-      const words = state.skillQuizHighlightedWords;
-      if (words.includes(word)) {
-          return { skillQuizHighlightedWords: words.filter(w => w !== word) };
-      }
-      return { skillQuizHighlightedWords: [...words, word] };
+    const words = state.skillQuizHighlightedWords;
+    if (words.includes(word)) {
+      return { skillQuizHighlightedWords: words.filter(w => w !== word) };
+    }
+    return { skillQuizHighlightedWords: [...words, word] };
   }),
-  setSkillQuizAnswer: (answerId, isCorrect) => set({ 
-      skillQuizSelectedAnswer: answerId,
-      skillQuizAnswerCorrect: isCorrect
+  setSkillQuizAnswer: (answerId, isCorrect) => set({
+    skillQuizSelectedAnswer: answerId,
+    skillQuizAnswerCorrect: isCorrect
   }),
-  startSkillQuiz: () => set({ 
-      skillQuizStartTime: Date.now(),
-      skillQuizHighlightedWords: [],
-      skillQuizSelectedAnswer: null,
-      skillQuizAnswerCorrect: null,
-      currentQuizIndex: 0,
-      quizResults: [],
-      quizCompleted: false
+  startSkillQuiz: () => set({
+    skillQuizStartTime: Date.now(),
+    skillQuizHighlightedWords: [],
+    skillQuizSelectedAnswer: null,
+    skillQuizAnswerCorrect: null,
+    currentQuizIndex: 0,
+    quizResults: [],
+    quizCompleted: false
   }),
   nextQuizQuestion: () => set((state) => {
-      const newResults = [...state.quizResults, state.skillQuizAnswerCorrect === true];
-      const newIndex = state.currentQuizIndex + 1;
-      // 如果完成了5题，标记为完成
-      if (newIndex >= 5) {
-          return {
-              quizResults: newResults,
-              quizCompleted: true,
-              skillQuizHighlightedWords: [],
-              skillQuizSelectedAnswer: null,
-              skillQuizAnswerCorrect: null
-          };
-      }
+    const newResults = [...state.quizResults, state.skillQuizAnswerCorrect === true];
+    const newIndex = state.currentQuizIndex + 1;
+    // 如果完成了5题，标记为完成
+    if (newIndex >= 5) {
       return {
-          currentQuizIndex: newIndex,
-          quizResults: newResults,
-          skillQuizHighlightedWords: [],
-          skillQuizSelectedAnswer: null,
-          skillQuizAnswerCorrect: null
+        quizResults: newResults,
+        quizCompleted: true,
+        skillQuizHighlightedWords: [],
+        skillQuizSelectedAnswer: null,
+        skillQuizAnswerCorrect: null
       };
+    }
+    return {
+      currentQuizIndex: newIndex,
+      quizResults: newResults,
+      skillQuizHighlightedWords: [],
+      skillQuizSelectedAnswer: null,
+      skillQuizAnswerCorrect: null
+    };
   }),
   completeQuiz: () => set({ quizCompleted: true }),
   resetQuiz: () => set({
-      currentQuizIndex: 0,
-      quizResults: [],
-      quizCompleted: false,
-      skillQuizHighlightedWords: [],
-      skillQuizSelectedAnswer: null,
-      skillQuizAnswerCorrect: null,
-      skillQuizStartTime: null,
-      skillQuizWrongAttempt: null
+    currentQuizIndex: 0,
+    quizResults: [],
+    quizCompleted: false,
+    skillQuizHighlightedWords: [],
+    skillQuizSelectedAnswer: null,
+    skillQuizAnswerCorrect: null,
+    skillQuizStartTime: null,
+    skillQuizWrongAttempt: null
   }),
   setSkillQuizWrongAttempt: (attempt) => set({ skillQuizWrongAttempt: attempt }),
   setDemoTeacherStep: (step) => set({ demoTeacherStep: step }),
 
-  reset: () => set({ 
-    userRole: null, 
-    currentStage: 'warm-up', 
-    messages: [], 
+  reset: () => set({
+    userRole: null,
+    currentStage: 'warm-up',
+    messages: [],
     quickReplies: [],
     lookups: [],
     highlights: [],
@@ -745,5 +749,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     quizCompleted: false,
     skillQuizWrongAttempt: null,
     demoTeacherStep: 0,
+    remoteStream: null,
   }),
+
+  // Video Actions
+  remoteStream: null,
+  setRemoteStream: (stream) => {
+    console.log('[Store] setRemoteStream called:', stream ? 'MediaStream with ' + stream.getTracks().length + ' tracks' : 'null');
+    set({ remoteStream: stream });
+  },
 }));

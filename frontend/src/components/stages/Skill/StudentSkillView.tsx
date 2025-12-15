@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     Target, Check, X, Clock, Hand, Search,
     Award, Sparkles, BookOpen, ArrowRight, Trophy, Lock, Pointer
 } from 'lucide-react';
@@ -121,14 +121,13 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                     { num: 3, text: '锁', active: demoTeacherStep >= 3, done: lockComplete }
                 ].map((step) => (
                     <div key={step.num} className="flex items-center">
-                        <motion.div 
+                        <motion.div
                             animate={step.active && !step.done ? { scale: [1, 1.1, 1] } : {}}
                             transition={{ repeat: Infinity, duration: 1.5 }}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${
-                                step.done ? 'bg-emerald-500 text-white' :
-                                step.active ? 'bg-blue-500 text-white' :
-                                'bg-gray-200 text-gray-400'
-                            }`}>
+                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step.done ? 'bg-emerald-500 text-white' :
+                                    step.active ? 'bg-blue-500 text-white' :
+                                        'bg-gray-200 text-gray-400'
+                                }`}>
                             {step.done ? <Check size={20} /> : step.num}
                         </motion.div>
                         <span className={`ml-2 text-sm ${step.active ? 'text-gray-700' : 'text-gray-400'}`}>
@@ -151,21 +150,20 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                         className="absolute top-0 bottom-0 w-20 bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent skew-x-12 z-10"
                     />
                 )}
-                
+
                 <span>In </span>
                 {/* 1969 - 可点击关键词 */}
-                <motion.span 
+                <motion.span
                     onClick={handleClick1969}
                     animate={demoTeacherStep >= 1 && !highlighted1969 ? { scale: [1, 1.05, 1] } : {}}
                     transition={{ repeat: Infinity, duration: 0.8 }}
-                    className={`relative cursor-pointer transition-all px-1 py-0.5 rounded ${
-                        highlighted1969 ? 'bg-yellow-300 font-semibold' : 
-                        demoTeacherStep >= 1 ? 'hover:bg-yellow-100 ring-2 ring-blue-400 ring-offset-2' : ''
-                    }`}
+                    className={`relative cursor-pointer transition-all px-1 py-0.5 rounded ${highlighted1969 ? 'bg-yellow-300 font-semibold' :
+                            demoTeacherStep >= 1 ? 'hover:bg-yellow-100 ring-2 ring-blue-400 ring-offset-2' : ''
+                        }`}
                 >
                     {/* 跳动的手指图标 */}
                     {demoTeacherStep >= 1 && !highlighted1969 && (
-                        <motion.div 
+                        <motion.div
                             animate={{ y: [0, -8, 0] }}
                             transition={{ repeat: Infinity, duration: 0.6 }}
                             className="absolute -top-8 left-1/2 -translate-x-1/2 z-50"
@@ -179,7 +177,7 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                 {/* 锁定区域 */}
                 <span className={`relative inline-block ${lockComplete ? '' : ''}`}>
                     {lockComplete && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             className="absolute -inset-2 rounded-lg border-2 border-emerald-500 bg-emerald-50/50 z-0"
@@ -189,7 +187,7 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                         the first person to walk on the Moon
                     </span>
                     {lockComplete && (
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             className="absolute -right-3 -top-3 z-20"
@@ -250,19 +248,18 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
 };
 
 // 可点击的单词组件
-const ClickableWord: React.FC<{ 
-    word: string; 
-    isHighlighted: boolean; 
+const ClickableWord: React.FC<{
+    word: string;
+    isHighlighted: boolean;
     onClick: () => void;
     disabled?: boolean;
 }> = ({ word, isHighlighted, onClick, disabled }) => {
     return (
-        <span 
+        <span
             onClick={disabled ? undefined : onClick}
-            className={`cursor-pointer px-0.5 rounded transition-all ${
-                isHighlighted ? 'bg-yellow-300 font-semibold' :
-                disabled ? '' : 'hover:bg-yellow-100'
-            }`}
+            className={`cursor-pointer px-0.5 rounded transition-all ${isHighlighted ? 'bg-yellow-300 font-semibold' :
+                    disabled ? '' : 'hover:bg-yellow-100'
+                }`}
         >
             {word}
         </span>
@@ -273,9 +270,9 @@ const ClickableWord: React.FC<{
  * 学生端技能阶段主组件
  */
 export const StudentSkillView: React.FC = () => {
-    const { 
-        skillNode, 
-        studentHasEquipped, 
+    const {
+        skillNode,
+        studentHasEquipped,
         setStudentEquipped,
         studentConfirmedFormula,
         setStudentConfirmedFormula,
@@ -284,16 +281,17 @@ export const StudentSkillView: React.FC = () => {
         demoTeacherStep,
         currentQuizIndex,
         quizCompleted,
-        skillQuizSelectedAnswer, 
+        skillQuizSelectedAnswer,
         skillQuizAnswerCorrect,
         skillQuizHighlightedWords,
         toggleSkillQuizWord,
-        setSkillQuizAnswer, 
+        setSkillQuizAnswer,
         setSkillQuizWrongAttempt,
         nextQuizQuestion,
-        startSkillQuiz
+        startSkillQuiz,
+        remoteStream
     } = useGameStore();
-    
+
     const [isEquipping, setIsEquipping] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
     const [wrongOptionId, setWrongOptionId] = useState<string | null>(null);
@@ -302,14 +300,14 @@ export const StudentSkillView: React.FC = () => {
     const currentQuiz = DEMO_QUIZ_DATA[currentQuizIndex] || DEMO_QUIZ_DATA[0];
 
     // 生成文字雨粒子
-    const rainParticles = useMemo(() => 
+    const rainParticles = useMemo(() =>
         TEXT_RAIN_WORDS.map((word) => ({
             word,
             delay: Math.random() * 3,
             duration: 4 + Math.random() * 4,
             left: Math.random() * 100
-        })), 
-    []);
+        })),
+        []);
 
     // 装备GPS卡
     const handleEquip = () => {
@@ -340,7 +338,7 @@ export const StudentSkillView: React.FC = () => {
     // 处理选项点击
     const handleOptionSelect = (optionId: string, isCorrect: boolean) => {
         if (skillQuizSelectedAnswer) return;
-        
+
         if (isCorrect) {
             setSkillQuizAnswer(optionId, true);
             setShowFeedback(true);
@@ -393,7 +391,7 @@ export const StudentSkillView: React.FC = () => {
             const cleanWord = word.replace(/[.,!?;:]/g, '');
             const isHighlighted = skillQuizHighlightedWords.includes(cleanWord);
             return (
-                <ClickableWord 
+                <ClickableWord
                     key={idx}
                     word={word}
                     isHighlighted={isHighlighted}
@@ -405,20 +403,21 @@ export const StudentSkillView: React.FC = () => {
     };
 
     return (
-        <div 
+        <div
             className="w-full h-full relative overflow-hidden transition-colors duration-1000"
             style={{
-                background: sceneState === 'overload' || sceneState === 'equip' 
-                    ? '#0f172a' 
+                background: sceneState === 'overload' || sceneState === 'equip'
+                    ? '#0f172a'
                     : 'linear-gradient(135deg, rgba(0, 180, 238, 0.08) 0%, rgba(0, 180, 238, 0.12) 40%, rgba(253, 231, 0, 0.1) 70%, rgba(253, 231, 0, 0.15) 100%)'
             }}
         >
-            
+
             {/* 视频窗口 - 支持跨阶段平滑动画 */}
             <VideoWindow
                 layoutId="student-video"
                 className="absolute top-6 right-6 w-64 z-[60] rounded-xl shadow-2xl"
                 placeholderText="老师视频连线中..."
+                videoStream={remoteStream}
             />
 
             {/* 工具栏 */}
@@ -464,8 +463,8 @@ export const StudentSkillView: React.FC = () => {
                 {sceneState === 'equip' && (
                     <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }}
                         className="absolute inset-0 flex items-center justify-center z-10">
-                        <GPSEquipCard 
-                            onEquip={handleEquip} 
+                        <GPSEquipCard
+                            onEquip={handleEquip}
                             isEquipping={isEquipping}
                             isEquipped={studentHasEquipped}
                         />
@@ -480,14 +479,14 @@ export const StudentSkillView: React.FC = () => {
                         className="absolute inset-0 flex items-center justify-center z-10 bg-gradient-to-br from-slate-900 to-slate-800">
                         <div className="max-w-2xl w-full mx-6 text-center">
                             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center" 
-                                     style={{ background: 'linear-gradient(135deg, #00B4EE, #0088CC)' }}>
+                                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
+                                    style={{ background: 'linear-gradient(135deg, #00B4EE, #0088CC)' }}>
                                     <BookOpen size={40} className="text-white" />
                                 </div>
                                 <h1 className="text-4xl font-bold text-white mb-2">GPS 定位法</h1>
                                 <p className="text-slate-400 mb-8">核心口诀 · Core Formula</p>
                             </motion.div>
-                            
+
                             <div className="flex gap-4 justify-center mb-8">
                                 {[
                                     { num: 1, text: '圈路标', en: 'CIRCLE KEYWORDS', color: '#00B4EE' },
@@ -497,7 +496,7 @@ export const StudentSkillView: React.FC = () => {
                                     <motion.div key={idx} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 + idx * 0.2 }}
                                         className="flex-1 bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
                                         <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center text-white font-bold text-xl"
-                                             style={{ backgroundColor: step.color }}>
+                                            style={{ backgroundColor: step.color }}>
                                             {step.num}
                                         </div>
                                         <div className="text-white text-xl font-bold mb-1">{step.text}</div>
@@ -505,9 +504,9 @@ export const StudentSkillView: React.FC = () => {
                                     </motion.div>
                                 ))}
                             </div>
-                            
+
                             <p className="text-slate-300 text-lg mb-8">三步定位，精准找答案！</p>
-                            
+
                             <motion.button onClick={handleConfirmFormula}
                                 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1 }}
                                 className="px-10 py-4 rounded-full font-bold text-lg flex items-center gap-3 mx-auto"
@@ -525,7 +524,7 @@ export const StudentSkillView: React.FC = () => {
                 {(sceneState === 'demo' || sceneState === 'ready') && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="absolute inset-0 flex items-center justify-center p-8">
-                        <InteractiveDemo 
+                        <InteractiveDemo
                             demoTeacherStep={demoTeacherStep}
                             onStepComplete={handleDemoStepComplete}
                         />
@@ -544,17 +543,16 @@ export const StudentSkillView: React.FC = () => {
                                 <div className="text-sm font-mono text-gray-500">QUESTION {currentQuizIndex + 1} / 5</div>
                                 <div className="flex gap-2">
                                     {[0, 1, 2, 3, 4].map((i) => (
-                                        <div key={i} className={`w-8 h-1.5 rounded-full ${
-                                            i < currentQuizIndex ? 'bg-emerald-500' :
-                                            i === currentQuizIndex ? 'bg-blue-500' :
-                                            'bg-gray-200'
-                                        }`} />
+                                        <div key={i} className={`w-8 h-1.5 rounded-full ${i < currentQuizIndex ? 'bg-emerald-500' :
+                                                i === currentQuizIndex ? 'bg-blue-500' :
+                                                    'bg-gray-200'
+                                            }`} />
                                     ))}
                                 </div>
                             </div>
 
                             {/* 关键词提示 Banner */}
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="mb-4 px-4 py-2 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-200 flex items-center gap-2"
@@ -570,7 +568,7 @@ export const StudentSkillView: React.FC = () => {
                                 <h2 className="text-2xl font-bold text-gray-800 mb-6">
                                     {renderClickableText(currentQuiz.question)}
                                 </h2>
-                                
+
                                 {/* 原文 */}
                                 <div className="bg-gray-50 rounded-xl p-4 mb-6">
                                     <div className="text-xs font-mono text-gray-400 mb-2">PASSAGE</div>
@@ -596,31 +594,29 @@ export const StudentSkillView: React.FC = () => {
                                         const isWrong = wrongOptionId === option.id;
                                         const showCorrect = showFeedback && option.isCorrect;
                                         const showWrongSelected = showFeedback && isSelected && !option.isCorrect;
-                                        
+
                                         return (
-                                            <motion.button 
+                                            <motion.button
                                                 key={option.id}
                                                 onClick={() => handleOptionSelect(option.id, option.isCorrect)}
                                                 disabled={!!skillQuizSelectedAnswer}
                                                 animate={isWrong ? { x: [-10, 10, -10, 10, 0] } : {}}
                                                 transition={{ duration: 0.4 }}
-                                                className={`p-4 rounded-xl border-2 text-left transition-all ${
-                                                    showCorrect ? 'border-emerald-500 bg-emerald-50' :
-                                                    showWrongSelected || isWrong ? 'border-red-500 bg-red-50' :
-                                                    isSelected ? 'border-blue-500 bg-blue-50' :
-                                                    'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                                                }`}
+                                                className={`p-4 rounded-xl border-2 text-left transition-all ${showCorrect ? 'border-emerald-500 bg-emerald-50' :
+                                                        showWrongSelected || isWrong ? 'border-red-500 bg-red-50' :
+                                                            isSelected ? 'border-blue-500 bg-blue-50' :
+                                                                'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                                                    }`}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                                                        showCorrect ? 'bg-emerald-500 text-white' :
-                                                        showWrongSelected || isWrong ? 'bg-red-500 text-white' :
-                                                        isSelected ? 'bg-blue-500 text-white' :
-                                                        'bg-gray-100 text-gray-600'
-                                                    }`}>
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${showCorrect ? 'bg-emerald-500 text-white' :
+                                                            showWrongSelected || isWrong ? 'bg-red-500 text-white' :
+                                                                isSelected ? 'bg-blue-500 text-white' :
+                                                                    'bg-gray-100 text-gray-600'
+                                                        }`}>
                                                         {showCorrect ? <Check size={16} /> :
-                                                         showWrongSelected || isWrong ? <X size={16} /> :
-                                                         option.id}
+                                                            showWrongSelected || isWrong ? <X size={16} /> :
+                                                                option.id}
                                                     </div>
                                                     <span className="text-gray-700 font-serif">{option.text}</span>
                                                 </div>
@@ -631,7 +627,7 @@ export const StudentSkillView: React.FC = () => {
 
                                 {/* 错误提示 */}
                                 {wrongOptionId && !showFeedback && (
-                                    <motion.div 
+                                    <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         className="mt-4 text-center text-red-600 font-medium"

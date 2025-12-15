@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     Search, Highlighter, PenLine, AlertCircle, AlertTriangle,
     Monitor, FileQuestion, Sparkles, Lightbulb, CheckCircle2, ListChecks
 } from 'lucide-react';
@@ -19,18 +19,21 @@ interface Activity {
 }
 
 export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { articleData, highlights, lookups, quizAnswers } = useGameStore();
+    const { articleData, highlights, lookups, quizAnswers, remoteStream } = useGameStore();
+
+    console.log('[CoachBattleView] remoteStream:', remoteStream ? 'MediaStream with ' + remoteStream.getTracks().length + ' tracks' : 'null');
+
 
     const generateActivities = (): Activity[] => {
         const activities: Activity[] = [];
         lookups.forEach((word, i) => {
-            activities.push({ id: `lookup-${i}`, type: 'lookup', timestamp: `16:25:${30 + i}`, content: 'Alex 查询单词', detail: word });
+            activities.push({ id: `lookup - ${i} `, type: 'lookup', timestamp: `16: 25:${30 + i} `, content: 'Alex 查询单词', detail: word });
         });
         highlights.forEach((h, i) => {
-            activities.push({ id: `highlight-${i}`, type: 'highlight', timestamp: `16:24:${40 + i}`, content: 'Alex 高亮了', detail: h.text.substring(0, 25) });
+            activities.push({ id: `highlight - ${i} `, type: 'highlight', timestamp: `16: 24:${40 + i} `, content: 'Alex 高亮了', detail: h.text.substring(0, 25) });
         });
         quizAnswers.forEach((answer, i) => {
-            activities.push({ id: `quiz-${i}`, type: 'quiz', timestamp: `16:26:${10 + i}`, content: `Alex 回答第 ${answer.questionId} 题`, detail: `选择了 ${answer.optionId}`, isUnsure: answer.isUnsure });
+            activities.push({ id: `quiz - ${i} `, type: 'quiz', timestamp: `16: 26:${10 + i} `, content: `Alex 回答第 ${answer.questionId} 题`, detail: `选择了 ${answer.optionId} `, isUnsure: answer.isUnsure });
         });
         activities.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         activities.unshift({ id: 'system-alert-base', type: 'alert', timestamp: '刚刚', content: '系统提醒', detail: 'Alex 已经 1 分钟 没有进行操作' });
@@ -120,20 +123,19 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                                 {q.options.map(opt => {
                                                     const isStudentChoice = studentAnswer?.optionId === opt.id;
                                                     return (
-                                                        <div 
-                                                            key={opt.id} 
-                                                            className={`text-sm py-3 px-4 rounded-xl border transition-all ${
-                                                                isStudentChoice ? 'border-blue-600 shadow-blue-200 shadow-sm' : 'bg-white border-slate-200'
-                                                            }`} 
+                                                        <div
+                                                            key={opt.id}
+                                                            className={`text - sm py - 3 px - 4 rounded - xl border transition - all ${isStudentChoice ? 'border-blue-600 shadow-blue-200 shadow-sm' : 'bg-white border-slate-200'
+                                                                } `}
                                                             style={isStudentChoice ? { backgroundColor: '#00B4EE', color: 'white' } : {}}
                                                         >
-                                                            <span className={`font-bold mr-3 ${isStudentChoice ? 'text-white' : 'text-slate-400'}`}>
+                                                            <span className={`font - bold mr - 3 ${isStudentChoice ? 'text-white' : 'text-slate-400'} `}>
                                                                 {opt.id}
                                                             </span>
                                                             <span className="font-serif">{opt.text}</span>
                                                             {isStudentChoice && studentAnswer?.isUnsure && (
-                                                                <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full inline-flex items-center gap-1" 
-                                                                      style={{ backgroundColor: '#FDE700', color: '#1A1A1A' }}>
+                                                                <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full inline-flex items-center gap-1"
+                                                                    style={{ backgroundColor: '#FDE700', color: '#1A1A1A' }}>
                                                                     <AlertCircle size={12} />不确定
                                                                 </span>
                                                             )}
@@ -152,11 +154,12 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
 
             {/* Right Pane: 30% - Vertical Stack */}
             <div className="flex-[3] flex flex-col gap-4 h-full overflow-hidden">
-                
+
                 {/* 视频窗口 - 支持跨阶段平滑动画 */}
                 <VideoWindow
                     layoutId="coach-video"
                     className="relative w-full shrink-0 rounded-xl shadow-md"
+                    videoStream={remoteStream}
                 />
 
                 {/* Slot 2: Stats Grid - Keep Original */}
@@ -185,10 +188,10 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                         {activities.map((activity) => {
                             const style = getActivityStyle(activity.type);
                             return (
-                                <div 
-                                    key={activity.id} 
-                                    className="shrink-0 relative rounded-md overflow-hidden transition-all hover:shadow-sm" 
-                                    style={{ backgroundColor: style.bg, border: `1px solid ${style.border}20` }}
+                                <div
+                                    key={activity.id}
+                                    className="shrink-0 relative rounded-md overflow-hidden transition-all hover:shadow-sm"
+                                    style={{ backgroundColor: style.bg, border: `1px solid ${style.border} 20` }}
                                 >
                                     <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: style.border }} />
                                     <div className="pl-2.5 pr-1.5 py-1.5 flex items-center gap-1.5">
@@ -197,7 +200,7 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                         </div>
                                         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                                             <span className="text-[10px] font-semibold text-slate-700">
-                                                {activity.content} 
+                                                {activity.content}
                                                 {activity.detail && <span className="text-[9px] text-slate-600"> {activity.detail}</span>}
                                             </span>
                                             <span className="text-[9px] font-mono text-slate-400 shrink-0">{activity.timestamp}</span>

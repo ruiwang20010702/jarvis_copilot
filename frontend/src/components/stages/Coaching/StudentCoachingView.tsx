@@ -2,14 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
-import { 
+import {
     Highlighter, Mic, CheckCircle2, BookOpen, BarChart3,
     X, HelpCircle, Navigation, Trophy, Send,
     MousePointer2, ChevronDown
 } from 'lucide-react';
-import { 
-    COACHING_DEMO_QUESTION, 
-    DEMO_QUIZ_ANALYSIS, 
+import {
+    COACHING_DEMO_QUESTION,
+    DEMO_QUIZ_ANALYSIS,
     getPhaseConfig
 } from './config';
 
@@ -49,9 +49,9 @@ const FULL_QUIZ_OPTIONS = [
 ];
 
 export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
-    const { 
-        articleData, 
-        focusParagraphIndex, 
+    const {
+        articleData,
+        focusParagraphIndex,
         coachingPhase,
         coachingTaskType,
         coachingTaskReceived,
@@ -66,14 +66,15 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         setStudentVoiceAnswer,
         highlights, // 实战阶段做题痕迹
         messages,
-        addMessage
+        addMessage,
+        remoteStream
     } = useGameStore();
 
     const paraRefs = useRef<(HTMLParagraphElement | null)[]>([]);
     const [activeTab, setActiveTab] = useState<'article' | 'analysis'>('analysis');
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [selectedText, setSelectedText] = useState<string | null>(null);
-    const [selectionInfo, setSelectionInfo] = useState<{top: number; left: number} | null>(null);
+    const [selectionInfo, setSelectionInfo] = useState<{ top: number; left: number } | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [showGpsCard, setShowGpsCard] = useState(false);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
 
     const handleStudentTextSelection = () => {
         if (coachingTaskType !== 'highlight' || !coachingTaskReceived) return;
-        
+
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
             setSelectionInfo(null);
@@ -106,9 +107,9 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
             setSelectionInfo(null);
             return;
         }
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            setSelectedText(text);
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectedText(text);
         setSelectionInfo({ top: rect.top - 60, left: rect.left + rect.width / 2 });
     };
 
@@ -130,7 +131,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const handleReceiveTask = () => {
         receiveCoachingTask();
         setShowTaskModal(false);
-        
+
         if (coachingTaskType === 'gps') {
             setShowGpsCard(true);
         }
@@ -180,9 +181,9 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const renderParagraphWithHighlights = (para: string, paraIndex: number) => {
         const isFocused = focusParagraphIndex === paraIndex;
         const isBlur = focusParagraphIndex !== null && !isFocused;
-        
+
         let content: React.ReactNode = para;
-        
+
         // 1. 实战阶段黄色高亮
         highlights.forEach(h => {
             if (para.includes(h.text)) {
@@ -232,16 +233,15 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         });
 
         return (
-            <p 
+            <p
                 key={paraIndex}
-                ref={el => { if(el) paraRefs.current[paraIndex] = el; }}
-                className={`mb-6 text-lg leading-relaxed font-serif transition-all duration-500 ${
-                    isFocused 
-                        ? 'text-slate-900 font-medium scale-[1.02] origin-left' 
-                        : isBlur 
-                        ? 'text-slate-300 opacity-50 blur-[0.5px] scale-[0.98]' 
-                        : 'text-slate-700'
-                } ${coachingTaskType === 'highlight' && coachingTaskReceived && isFocused ? 'cursor-text select-text' : ''}`}
+                ref={el => { if (el) paraRefs.current[paraIndex] = el; }}
+                className={`mb-6 text-lg leading-relaxed font-serif transition-all duration-500 ${isFocused
+                        ? 'text-slate-900 font-medium scale-[1.02] origin-left'
+                        : isBlur
+                            ? 'text-slate-300 opacity-50 blur-[0.5px] scale-[0.98]'
+                            : 'text-slate-700'
+                    } ${coachingTaskType === 'highlight' && coachingTaskReceived && isFocused ? 'cursor-text select-text' : ''}`}
             >
                 {content}
             </p>
@@ -254,17 +254,16 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                 {quiz.options.map(opt => {
                     const isStudentAnswer = opt.id === quiz.studentAnswer;
                     const isCorrect = opt.id === quiz.correctAnswer;
-                    
+
                     return (
-                        <div 
+                        <div
                             key={opt.id}
-                            className={`p-3 rounded-lg border flex justify-between items-center text-sm ${
-                                isStudentAnswer && !isCorrect
+                            className={`p-3 rounded-lg border flex justify-between items-center text-sm ${isStudentAnswer && !isCorrect
                                     ? 'bg-rose-50 border-rose-200 text-rose-700'
                                     : isCorrect
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                    : 'bg-slate-50 border-slate-100 text-slate-500'
-                            }`}
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                        : 'bg-slate-50 border-slate-100 text-slate-500'
+                                }`}
                         >
                             <div className="flex gap-2">
                                 <span className="font-bold">{opt.id}.</span>
@@ -288,13 +287,13 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
             {/* 任务接收弹窗 */}
             <AnimatePresence>
                 {showTaskModal && coachingTaskType && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center"
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
@@ -338,7 +337,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center"
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.8, opacity: 0, y: 50 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.8, opacity: 0, y: 50 }}
@@ -349,10 +348,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                             </div>
                             <h3 className="text-2xl font-bold mb-2">GPS 定位卡</h3>
                             <p className="text-cyan-100 text-sm mb-6 leading-relaxed">
-                                三步定位法：<br/>
+                                三步定位法：<br />
                                 <strong>1. 圈路标</strong> → <strong>2. 搜原句</strong> → <strong>3. 锁答案</strong>
                             </p>
-                            <button 
+                            <button
                                 onClick={handleReceiveGps}
                                 className="w-full py-3 bg-white text-cyan-600 font-bold rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg"
                             >
@@ -376,39 +375,37 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                         <Highlighter size={16} />
                         <button onClick={confirmHighlightAndSubmit} className="font-bold text-sm">
                             确认画线并提交
-                            </button>
+                        </button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* 左侧 70% */}
             <div className="flex-[7] bg-white rounded-3xl shadow-sm overflow-hidden flex flex-col"
-                 style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
-                
+                style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+
                 <div className="h-14 border-b border-slate-100 flex items-center px-6 bg-white gap-2 shrink-0">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('article')}
-                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${
-                            activeTab === 'article' 
-                                ? 'bg-slate-900 text-white border-slate-900' 
+                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'article'
+                                ? 'bg-slate-900 text-white border-slate-900'
                                 : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                        }`}
+                            }`}
                     >
                         <BookOpen size={16} />
                         原文
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('analysis')}
-                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${
-                            activeTab === 'analysis' 
-                                ? 'bg-slate-900 text-white border-slate-900' 
+                        className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'analysis'
+                                ? 'bg-slate-900 text-white border-slate-900'
                                 : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                        }`}
+                            }`}
                     >
                         <BarChart3 size={16} />
                         题目分析
                     </button>
-                    
+
                     {highlights.length > 0 && (
                         <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                             我的 {highlights.length} 处标记
@@ -419,13 +416,12 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                 <div className="flex-1 overflow-y-auto p-6" onMouseUp={handleStudentTextSelection}>
                     {activeTab === 'article' && (
                         <div className="max-w-3xl mx-auto animate-in fade-in duration-300">
-                            <h2 className={`text-2xl font-bold text-slate-800 mb-6 font-serif transition-opacity ${
-                                focusParagraphIndex !== null ? 'opacity-30' : 'opacity-100'
-                            }`}>
-                                    {articleData.title}
+                            <h2 className={`text-2xl font-bold text-slate-800 mb-6 font-serif transition-opacity ${focusParagraphIndex !== null ? 'opacity-30' : 'opacity-100'
+                                }`}>
+                                {articleData.title}
                             </h2>
                             {articleData.paragraphs.map((para, i) => renderParagraphWithHighlights(para, i))}
-                            
+
                             <div className="mt-8 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
                                 <div className="text-xs font-bold text-amber-600 mb-2 uppercase tracking-wider">
                                     错题相关段落
@@ -460,17 +456,16 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                     const isExpanded = expandedQuestion === item.questionId;
 
                                     return (
-                                        <div 
-                                            key={item.questionId} 
-                                            className={`rounded-2xl border-2 transition-all overflow-hidden ${
-                                                item.status === 'wrong' 
-                                                    ? 'bg-rose-50/50 border-rose-200' 
+                                        <div
+                                            key={item.questionId}
+                                            className={`rounded-2xl border-2 transition-all overflow-hidden ${item.status === 'wrong'
+                                                    ? 'bg-rose-50/50 border-rose-200'
                                                     : item.status === 'guessed'
-                                                    ? 'bg-amber-50/50 border-amber-200'
-                                                    : 'bg-emerald-50/30 border-emerald-200'
-                                            }`}
+                                                        ? 'bg-amber-50/50 border-amber-200'
+                                                        : 'bg-emerald-50/30 border-emerald-200'
+                                                }`}
                                         >
-                                            <div 
+                                            <div
                                                 className="p-4 cursor-pointer hover:bg-white/30 transition-colors"
                                                 onClick={() => setExpandedQuestion(isExpanded ? null : item.questionId)}
                                             >
@@ -484,22 +479,21 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                            item.status === 'wrong' 
-                                                                ? 'bg-rose-100 text-rose-700' 
+                                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'wrong'
+                                                                ? 'bg-rose-100 text-rose-700'
                                                                 : item.status === 'guessed'
-                                                                ? 'bg-amber-100 text-amber-700'
-                                                                : 'bg-emerald-100 text-emerald-700'
-                                                        }`}>
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                            }`}>
                                                             {item.status === 'wrong' ? '错误' : item.status === 'guessed' ? '蒙对' : '正确'}
                                                         </div>
-                                                        <ChevronDown 
-                                                            size={16} 
+                                                        <ChevronDown
+                                                            size={16}
                                                             className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                                         />
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="flex items-center gap-4 text-sm mt-2 ml-11">
                                                     <span className="text-slate-500">
                                                         我的答案: <span className={item.isCorrect ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>{item.studentAnswer}</span>
@@ -522,7 +516,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                     >
                                                         <div className="p-4 pt-3">
                                                             {renderQuestionOptions(fullQuiz, item)}
-                                                            
+
                                                             {item.status === 'wrong' && coachingPhase > 0 && (
                                                                 <div className="mt-4 p-3 bg-rose-100/50 rounded-lg border border-rose-200">
                                                                     <div className="text-sm font-bold text-rose-700 mb-1">
@@ -556,23 +550,22 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                             {COACHING_DEMO_QUESTION.options.map(opt => {
                                                 const isSelected = selectedAnswer === opt.id;
                                                 const isCorrect = opt.isCorrect && isSelected;
-                                            return (
-                                                    <button 
+                                                return (
+                                                    <button
                                                         key={opt.id}
                                                         onClick={() => handleSelectAnswer(opt.id)}
                                                         disabled={coachingTaskCompleted}
-                                                        className={`w-full p-4 rounded-xl border-2 flex justify-between items-center transition-all ${
-                                                            isCorrect
+                                                        className={`w-full p-4 rounded-xl border-2 flex justify-between items-center transition-all ${isCorrect
                                                                 ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
                                                                 : isSelected && !opt.isCorrect
-                                                                ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
-                                                        } ${coachingTaskCompleted ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                                                    : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
+                                                            } ${coachingTaskCompleted ? 'cursor-default' : 'cursor-pointer'}`}
                                                     >
-                                                    <div className="flex gap-3">
-                                                        <span className="font-bold">{opt.id}.</span>
-                                                        <span className="font-medium">{opt.text}</span>
-                                                    </div>
+                                                        <div className="flex gap-3">
+                                                            <span className="font-bold">{opt.id}.</span>
+                                                            <span className="font-medium">{opt.text}</span>
+                                                        </div>
                                                         {isCorrect && <CheckCircle2 size={20} className="text-emerald-600" />}
                                                     </button>
                                                 );
@@ -630,7 +623,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
 
             {/* 右侧 30% - 重新设计布局 */}
             <div className="flex-[3] flex flex-col h-full overflow-hidden">
-                
+
                 {/* 上方可滚动区域 */}
                 <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pb-2">
                     {/* 视频窗口 - 支持跨阶段平滑动画 */}
@@ -639,11 +632,12 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                         className="relative w-full shrink-0 rounded-xl shadow-md"
                         placeholderText="老师视频连线中..."
                         style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
+                        videoStream={remoteStream}
                     />
 
                     {/* 任务区域 */}
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm"
-                         style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
                         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                 当前任务
@@ -686,11 +680,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                         <button
                                             onMouseDown={() => setIsRecording(true)}
                                             onMouseUp={handleVoiceComplete}
-                                            className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                                                isRecording 
-                                                    ? 'bg-rose-500 text-white scale-[1.02]' 
+                                            className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isRecording
+                                                    ? 'bg-rose-500 text-white scale-[1.02]'
                                                     : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
-                                            }`}
+                                                }`}
                                         >
                                             <Mic size={20} />
                                             {isRecording ? '松开提交' : '按住说话'}
@@ -709,7 +702,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                 {/* 聊天窗 - 固定高度 */}
                 <div className="h-64 shrink-0 mt-2">
                     <div className="flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm h-full"
-                         style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
                         <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                 CHAT LOG
@@ -731,24 +724,23 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                             </div>
                                         </div>
                                     ))}
-                                    
+
                                     {messages.slice(-5).map((msg) => (
                                         <div
                                             key={msg.id}
                                             className={`flex ${msg.role === 'student' ? 'justify-end' : 'justify-start'}`}
                                         >
                                             <div
-                                                className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
-                                                    msg.role === 'student'
+                                                className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'student'
                                                         ? 'bg-[#00B4EE] text-white'
                                                         : msg.role === 'jarvis'
-                                                        ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
-                                                        : 'bg-slate-100 text-slate-700'
-                                                }`}
+                                                            ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
+                                                            : 'bg-slate-100 text-slate-700'
+                                                    }`}
                                             >
                                                 <div className="text-[10px] opacity-60 mb-0.5 font-semibold">
-                                                    {msg.role === 'jarvis' ? 'Jarvis' : 
-                                                     msg.role === 'student' ? '我' : '老师'}
+                                                    {msg.role === 'jarvis' ? 'Jarvis' :
+                                                        msg.role === 'student' ? '我' : '老师'}
                                                 </div>
                                                 {msg.text}
                                             </div>

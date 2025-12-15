@@ -55,10 +55,18 @@ class ConnectionManager:
         payload = data.get("payload", {})
         role = data.get("role")
 
-        # Update role if provided
-        if role and client_id not in self.client_roles:
-            self.client_roles[client_id] = role
-            print(f"🎭 {client_id} role set: {role}")
+        # Update role whenever provided (not just first time)
+        if role:
+            if self.client_roles.get(client_id) != role:
+                self.client_roles[client_id] = role
+                print(f"🎭 {client_id} role set: {role}")
+
+        if msg_type == "JOIN":
+            # Client announcing their presence
+            print(f"👋 {client_id} joined as {role}")
+            # Role already set above
+            return
+
 
         if msg_type == "STATE_UPDATE":
             # Update room state
@@ -91,6 +99,20 @@ class ConnectionManager:
                 "senderRole": role,
                 "timestamp": asyncio.get_event_loop().time()
             })
+
+        elif msg_type == "WEBRTC_SIGNAL":
+            # Forward WebRTC signaling messages (offer, answer, candidate) to other clients
+            # Use stored role to ensure senderRole is always set
+            stored_role = self.client_roles.get(client_id, role)
+            print(f"📡 {client_id} signal: {payload.get('type')} (role: {stored_role})")
+            await self.broadcast({
+                "type": "WEBRTC_SIGNAL",
+                "payload": payload,
+                "senderId": client_id,
+                "senderRole": stored_role,
+                "timestamp": asyncio.get_event_loop().time()
+            }, sender_id=client_id)
+
 
 manager = ConnectionManager()
 

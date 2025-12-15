@@ -12,19 +12,19 @@ import { StudentCoachingView, CoachCoachingView } from '../src/components/stages
 import { StudentVocabView, CoachVocabView } from '../src/components/stages/Vocab';
 import { StudentSurgeryView, CoachSurgeryView } from '../src/components/stages/Surgery';
 import { StudentReviewView, CoachReviewView } from '../src/components/stages/Review';
-import { 
-  Zap, Swords, BrainCircuit, Library, ScanSearch, Trophy, // Navbar Icons
-  User, Monitor, Split, // DevControl Icons
-  MessageSquare, Mic, Sparkles, Send, Target, ChevronRight, LayoutDashboard, ArrowRight,
-  Battery, Signal, Wifi, // Mobile Status Icons
-  Clock, Search, Highlighter, HelpCircle, CheckCircle2, AlertCircle, X,
-  Lightbulb, Volume2, VolumeX, Edit3, MessageCircle, Play,
-  Stethoscope, Clapperboard, BookOpen, FileQuestion, MousePointer2, AlertTriangle, ShieldAlert,
-  RotateCw, Check, ListChecks, BarChart3, Repeat, Scissors, RefreshCcw, Maximize2, PartyPopper,
-  Undo2, Eye, Hand, GraduationCap, GripVertical, TrendingUp, Mountain, Music,
-  PenLine, MoreHorizontal, // 实时活动记录图标
-  CloudRain, Radar, // Skill Phase Icons
-  Award, Star // Mini-Quiz Reward Icons
+import {
+    Zap, Swords, BrainCircuit, Library, ScanSearch, Trophy, // Navbar Icons
+    User, Monitor, Split, // DevControl Icons
+    MessageSquare, Mic, Sparkles, Send, Target, ChevronRight, LayoutDashboard, ArrowRight,
+    Battery, Signal, Wifi, // Mobile Status Icons
+    Clock, Search, Highlighter, HelpCircle, CheckCircle2, AlertCircle, X,
+    Lightbulb, Volume2, VolumeX, Edit3, MessageCircle, Play,
+    Stethoscope, Clapperboard, BookOpen, FileQuestion, MousePointer2, AlertTriangle, ShieldAlert,
+    RotateCw, Check, ListChecks, BarChart3, Repeat, Scissors, RefreshCcw, Maximize2, PartyPopper,
+    Undo2, Eye, Hand, GraduationCap, GripVertical, TrendingUp, Mountain, Music,
+    PenLine, MoreHorizontal, // 实时活动记录图标
+    CloudRain, Radar, // Skill Phase Icons
+    Award, Star // Mini-Quiz Reward Icons
 } from 'lucide-react';
 
 // --- Types & Config ---
@@ -52,14 +52,13 @@ const StageNavbar: React.FC = () => {
                     <button
                         key={s.id}
                         onClick={() => setStage(s.id)}
-                        className={`relative px-4 py-1.5 rounded-full transition-all duration-300 group ${
-                            isActive 
-                            ? 'shadow-sm' 
+                        className={`relative px-4 py-1.5 rounded-full transition-all duration-300 group ${isActive
+                            ? 'shadow-sm'
                             : 'hover:bg-white/20'
-                        }`}
+                            }`}
                         style={isActive ? {} : { color: 'rgba(0,0,0,0.7)' }}
                     >
-                            {isActive && (
+                        {isActive && (
                             <motion.div
                                 layoutId="stage-active-pill"
                                 className="absolute inset-0 rounded-full bg-white shadow-md"
@@ -81,10 +80,10 @@ const StageNavbar: React.FC = () => {
 
 const DevControls: React.FC = () => {
     const { viewMode, setViewMode } = useGameStore();
-    
+
     return (
         <div className="fixed bottom-4 left-4 z-50 flex items-center gap-1 p-1 bg-black/80 backdrop-blur text-white rounded-full shadow-2xl border border-white/10">
-            <button 
+            <button
                 onClick={() => setViewMode('student')}
                 className={`p-2 rounded-full transition-colors ${viewMode === 'student' ? 'bg-white/20' : 'hover:bg-white/10 text-slate-400'}`}
                 title="Student View"
@@ -92,7 +91,7 @@ const DevControls: React.FC = () => {
                 <User size={16} />
             </button>
             <div className="w-px h-4 bg-white/20" />
-            <button 
+            <button
                 onClick={() => setViewMode('coach')}
                 className={`p-2 rounded-full transition-colors ${viewMode === 'coach' ? 'bg-white/20' : 'hover:bg-white/10 text-slate-400'}`}
                 title="Coach View"
@@ -100,7 +99,7 @@ const DevControls: React.FC = () => {
                 <Monitor size={16} />
             </button>
             <div className="w-px h-4 bg-white/20" />
-            <button 
+            <button
                 onClick={() => setViewMode('split')}
                 className={`p-2 rounded-full transition-colors ${viewMode === 'split' ? 'bg-white/20' : 'hover:bg-white/10 text-slate-400'}`}
                 title="Split View"
@@ -111,144 +110,156 @@ const DevControls: React.FC = () => {
     );
 };
 
+import { useWebRTC } from '../src/hooks/useWebRTC';
+import { VideoWindow } from '../src/components/shared/VideoWindow';
+
 // --- Main Container ---
 
 const Classroom: React.FC = () => {
-  const { userRole, viewMode, currentStage } = useGameStore();
-  const navigate = useNavigate();
-  const [remainingSeconds, setRemainingSeconds] = useState(420); // 7分钟（实战阶段专用）
+    const { userRole, viewMode, currentStage, remoteStream } = useGameStore();
+    const navigate = useNavigate();
+    const [remainingSeconds, setRemainingSeconds] = useState(420); // 7分钟（实战阶段专用）
 
-  useEffect(() => {
-      if (!userRole) navigate('/');
-  }, [userRole, navigate]);
+    // Compute WebRTC role - MUST be correct before calling useWebRTC
+    const webrtcRole: 'student' | 'teacher' = userRole === 'coach' ? 'teacher' : 'student';
+    console.log('[Classroom] userRole:', userRole, 'webrtcRole:', webrtcRole);
 
-  // 倒计时逻辑（仅在实战阶段运行）
-  useEffect(() => {
-      if (currentStage !== 'battle') return;
-      
-      const timer = setInterval(() => {
-          setRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
-  }, [currentStage]);
+    // Global WebRTC Connection
+    useWebRTC({ role: webrtcRole });
 
-  // 格式化时间为 MM:SS
-  const formatTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+    useEffect(() => {
+        if (!userRole) navigate('/');
+    }, [userRole, navigate]);
 
-  // 根据剩余时间计算圆点状态
-  const getTimerDotState = () => {
-      if (remainingSeconds > 300) return 'normal';      // > 5分钟：绿色
-      if (remainingSeconds > 60) return 'urgent';       // 1-5分钟：黄色
-      return 'warning';                                 // < 1分钟：红色 + 闪烁
-  };
 
-  const timerDotState = getTimerDotState();
+    // 倒计时逻辑（仅在实战阶段运行）
+    useEffect(() => {
+        if (currentStage !== 'battle') return;
 
-  return (
-      <div className="w-full h-screen bg-white font-sans flex flex-col overflow-hidden">
-        {/* Sticky Top Header - 品牌渐变风格 */}
-        <header 
-            className="w-full h-16 shadow-md flex items-center justify-between px-6 z-50 shrink-0"
-            style={{
-                backgroundColor: '#3B82F6', // Fallback
-                backgroundImage: `
+        const timer = setInterval(() => {
+            setRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [currentStage]);
+
+    // 格式化时间为 MM:SS
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // 根据剩余时间计算圆点状态
+    const getTimerDotState = () => {
+        if (remainingSeconds > 300) return 'normal';      // > 5分钟：绿色
+        if (remainingSeconds > 60) return 'urgent';       // 1-5分钟：黄色
+        return 'warning';                                 // < 1分钟：红色 + 闪烁
+    };
+
+    const timerDotState = getTimerDotState();
+
+    return (
+        <div className="w-full h-screen bg-white font-sans flex flex-col overflow-hidden">
+            {/* Sticky Top Header - 品牌渐变风格 */}
+            <header
+                className="w-full h-16 shadow-md flex items-center justify-between px-6 z-50 shrink-0"
+                style={{
+                    backgroundColor: '#3B82F6', // Fallback
+                    backgroundImage: `
                     radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
                     linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                     linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                     linear-gradient(135deg, #3B82F6 0%, #60A5FA 25%, #FEF08A 75%, #FEF3C7 100%)
                 `,
-                backgroundSize: `
+                    backgroundSize: `
                     20px 20px,
                     40px 40px,
                     40px 40px,
                     100% 100%
                 `,
-                backgroundAttachment: 'fixed'
-            }}
-        >
-             {/* Logo/Left */}
-             <div className="flex items-center gap-2 font-bold text-gray-900">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm" style={{ background: 'rgba(0,0,0,0.15)' }}>
-                    <Zap size={18} fill="currentColor" />
+                    backgroundAttachment: 'fixed'
+                }}
+            >
+                {/* Logo/Left */}
+                <div className="flex items-center gap-2 font-bold text-gray-900">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                        <Zap size={18} fill="currentColor" />
+                    </div>
+                    <span className="tracking-tight text-lg">Jarvis</span>
                 </div>
-                <span className="tracking-tight text-lg">Jarvis</span>
-             </div>
-            
-            {/* Center Navigation - 绝对居中 */}
-            <div className="absolute left-1/2 -translate-x-1/2">
-                <StageNavbar />
-            </div>
 
-            {/* Right Side - 倒计时 + 用户信息 */}
-            <div className="flex items-center gap-4">
-                 {/* 倒计时组件 - 幽灵按钮风格（仅实战阶段显示）*/}
-                 {currentStage === 'battle' && (
-                    <div className="flex items-center gap-3 px-4 py-2 bg-white/40 backdrop-blur border border-white/60 rounded-xl shadow-sm">
-                        {/* 状态圆点指示器 */}
-                        <div className="relative flex items-center justify-center">
-                            <div 
-                                className={`w-2 h-2 rounded-full transition-colors ${
-                                    timerDotState === 'warning' ? 'bg-red-500 animate-pulse' :
-                                    timerDotState === 'urgent' ? 'bg-yellow-500' :
-                                    'bg-green-500'
-                                }`}
-                            />
-                            {/* 外圈光晕（警告状态）*/}
-                            {timerDotState === 'warning' && (
-                                <div className="absolute inset-0 w-2 h-2 bg-red-400 rounded-full animate-ping opacity-75" />
-                            )}
+                {/* Center Navigation - 绝对居中 */}
+                <div className="absolute left-1/2 -translate-x-1/2">
+                    <StageNavbar />
+                </div>
+
+                {/* Right Side - 倒计时 + 用户信息 */}
+                <div className="flex items-center gap-4">
+                    {/* 倒计时组件 - 幽灵按钮风格（仅实战阶段显示）*/}
+                    {currentStage === 'battle' && (
+                        <div className="flex items-center gap-3 px-4 py-2 bg-white/40 backdrop-blur border border-white/60 rounded-xl shadow-sm">
+                            {/* 状态圆点指示器 */}
+                            <div className="relative flex items-center justify-center">
+                                <div
+                                    className={`w-2 h-2 rounded-full transition-colors ${timerDotState === 'warning' ? 'bg-red-500 animate-pulse' :
+                                        timerDotState === 'urgent' ? 'bg-yellow-500' :
+                                            'bg-green-500'
+                                        }`}
+                                />
+                                {/* 外圈光晕（警告状态）*/}
+                                {timerDotState === 'warning' && (
+                                    <div className="absolute inset-0 w-2 h-2 bg-red-400 rounded-full animate-ping opacity-75" />
+                                )}
+                            </div>
+
+                            {/* 时间显示 */}
+                            <span
+                                className="font-mono font-bold text-slate-900"
+                                style={{ fontSize: '15px', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}
+                            >
+                                {formatTime(remainingSeconds)}
+                            </span>
                         </div>
-                        
-                        {/* 时间显示 */}
-                        <span 
-                            className="font-mono font-bold text-slate-900"
-                            style={{ fontSize: '15px', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}
-                        >
-                            {formatTime(remainingSeconds)}
+                    )}
+
+                    {/* 用户信息 - 根据视图模式动态显示 */}
+                    <div className="hidden md:flex flex-col items-end">
+                        <span className="text-xs font-bold text-gray-900">
+                            {viewMode === 'coach' ? 'Bryce Zhou' : 'Alex Johnson'}
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">
+                            {viewMode === 'coach' ? '教师' : 'Student'}
                         </span>
                     </div>
-                 )}
-
-                 {/* 用户信息 - 根据视图模式动态显示 */}
-                 <div className="hidden md:flex flex-col items-end">
-                     <span className="text-xs font-bold text-gray-900">
-                         {viewMode === 'coach' ? 'Bryce Zhou' : 'Alex Johnson'}
-                     </span>
-                     <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">
-                         {viewMode === 'coach' ? '教师' : 'Student'}
-                     </span>
-                 </div>
-                 <div className="w-9 h-9 rounded-full bg-white/40 backdrop-blur border border-white/60 flex items-center justify-center text-gray-900 font-bold shadow-sm">
-                     {viewMode === 'coach' ? 'BZ' : 'AJ'}
-                 </div>
-            </div>
-        </header>
-
-        {/* Main Content Area */}
-        <div className="flex-1 w-full overflow-hidden relative">
-            {viewMode === 'split' ? (
-                <div className="flex w-full h-full">
-                    <div className="w-1/2 h-full border-r border-slate-200 relative bg-white overflow-hidden">
-                        <StudentView isEmbedded />
-                    </div>
-                    <div className="w-1/2 h-full relative bg-white overflow-hidden">
-                        <CoachView isEmbedded />
+                    <div className="w-9 h-9 rounded-full bg-white/40 backdrop-blur border border-white/60 flex items-center justify-center text-gray-900 font-bold shadow-sm">
+                        {viewMode === 'coach' ? 'BZ' : 'AJ'}
                     </div>
                 </div>
-            ) : viewMode === 'coach' ? (
-                <CoachView />
-            ) : (
-                <StudentView />
-            )}
+            </header>
+
+            {/* Main Content Area */}
+            <div className="flex-1 w-full overflow-hidden relative">
+                {viewMode === 'split' ? (
+                    <div className="flex w-full h-full">
+                        <div className="w-1/2 h-full border-r border-slate-200 relative bg-white overflow-hidden">
+                            <StudentView isEmbedded />
+                        </div>
+                        <div className="w-1/2 h-full relative bg-white overflow-hidden">
+                            <CoachView isEmbedded />
+                        </div>
+                    </div>
+                ) : viewMode === 'coach' ? (
+                    <CoachView />
+                ) : (
+                    <StudentView />
+                )}
+            </div>
+
+
+            <DevControls />
         </div>
-        
-        <DevControls />
-      </div>
-  );
+    );
+
 };
 
 // ==========================================
@@ -305,14 +316,14 @@ const CoachView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
 
     return (
         <div className={`w-full h-full font-sans flex flex-col ${isEmbedded ? 'text-[0.9em]' : ''}`}>
-             {/* 使用新拆分的模块 */}
-             {currentStage === 'warm-up' && <CoachWarmupView isEmbedded={isEmbedded} />}
-             {currentStage === 'skill' && <CoachSkillView isEmbedded={isEmbedded} />}
-             {currentStage === 'battle' && <CoachBattleView isEmbedded={isEmbedded} />}
-             {currentStage === 'coaching' && <CoachCoachingView isEmbedded={isEmbedded} />}
-             {currentStage === 'vocab' && <CoachVocabView isEmbedded={isEmbedded} />}
-             {currentStage === 'surgery' && <CoachSurgeryView isEmbedded={isEmbedded} />}
-             {currentStage === 'review' && <CoachReviewView />}
+            {/* 使用新拆分的模块 */}
+            {currentStage === 'warm-up' && <CoachWarmupView isEmbedded={isEmbedded} />}
+            {currentStage === 'skill' && <CoachSkillView isEmbedded={isEmbedded} />}
+            {currentStage === 'battle' && <CoachBattleView isEmbedded={isEmbedded} />}
+            {currentStage === 'coaching' && <CoachCoachingView isEmbedded={isEmbedded} />}
+            {currentStage === 'vocab' && <CoachVocabView isEmbedded={isEmbedded} />}
+            {currentStage === 'surgery' && <CoachSurgeryView isEmbedded={isEmbedded} />}
+            {currentStage === 'review' && <CoachReviewView />}
             <CoachStageController />
         </div>
     );
@@ -320,7 +331,7 @@ const CoachView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
 
 const CoachStageController: React.FC = () => {
     const { currentStage, setStage } = useGameStore();
-    
+
     const nextStage = () => {
         const idx = STAGES.findIndex(s => s.id === currentStage);
         if (idx < STAGES.length - 1) {
@@ -338,8 +349,8 @@ const CoachStageController: React.FC = () => {
                         {STAGES.find(s => s.id === currentStage)?.label || 'Loading...'}
                     </div>
                 </div>
-                
-                <button 
+
+                <button
                     onClick={nextStage}
                     className="group flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-full font-bold text-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all"
                 >

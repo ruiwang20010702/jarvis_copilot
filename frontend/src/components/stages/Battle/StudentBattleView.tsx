@@ -12,6 +12,7 @@ import {
  */
 export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
     const {
+        remoteStream, // Get from store
         articleData,
         highlights,
         addHighlight,
@@ -125,11 +126,37 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const confirmHighlight = () => {
         if (selectedText) {
-            const existingHighlight = highlights.find(h =>
-                h.text.toLowerCase() === selectedText.toLowerCase()
+            // Check if selected text is part of any existing highlight (or vice versa)
+            const existingHighlights = highlights.filter(h =>
+                h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
+                selectedText.toLowerCase().includes(h.text.toLowerCase())
             );
-            if (existingHighlight) {
-                removeHighlight(existingHighlight.id);
+
+            if (existingHighlights.length > 0) {
+                existingHighlights.forEach(h => {
+                    // Case 1: The highlight is fully contained in the selection (e.g. select "Hello World", highlight was "Hello")
+                    // We just remove it.
+                    if (selectedText.toLowerCase().includes(h.text.toLowerCase())) {
+                        removeHighlight(h.id);
+                    }
+                    // Case 2: The selection is inside the highlight (e.g. select "Hello", highlight was "Hello World")
+                    // We remove the original, and add the remaining parts.
+                    else if (h.text.toLowerCase().includes(selectedText.toLowerCase())) {
+                        removeHighlight(h.id);
+
+                        // Split the highlight text by the selected text
+                        // Use regex for case-insensitive splitting
+                        const escapedSelection = selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const parts = h.text.split(new RegExp(escapedSelection, 'gi'));
+
+                        parts.forEach(part => {
+                            const trimmedPart = part.trim();
+                            if (trimmedPart.length > 0) {
+                                addHighlight(trimmedPart);
+                            }
+                        });
+                    }
+                });
             } else {
                 addHighlight(selectedText);
             }
@@ -339,8 +366,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
             <AnimatePresence>
                 {selectionRect && (() => {
+                    // Check if selected text is part of any existing highlight
                     const isHighlighted = selectedText && highlights.some(h =>
-                        h.text.toLowerCase() === selectedText.toLowerCase()
+                        h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
+                        selectedText.toLowerCase().includes(h.text.toLowerCase())
                     );
                     return (
                         <motion.div
@@ -405,8 +434,8 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                     layoutId="student-video"
                     className="relative w-full shrink-0 mb-6 rounded-xl shadow-md"
                     placeholderText="老师视频连线中..."
+                    videoStream={remoteStream}
                 />
-
                 {/* 答题卡区域 */}
                 <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
                     <div className="h-12 px-5 flex items-center justify-between shrink-0 bg-slate-50 border-b border-slate-100">
