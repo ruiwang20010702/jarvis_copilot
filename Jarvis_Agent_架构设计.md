@@ -486,4 +486,3 @@ function handleAction(action: AgentAction) {
 
 1. **等待 Prompt**: 创建 `skill_tutor.md`, `vocab_tutor.md`, `surgery_tutor.md`
 2. **扩展 Agent**: 实现 `SkillAgent`, `VocabAgent`, `SurgeryAgent`
-3. **完善交互**: 前端 select_option 需从 store 获取实际学生选择

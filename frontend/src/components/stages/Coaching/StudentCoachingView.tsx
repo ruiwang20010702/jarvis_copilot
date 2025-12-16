@@ -14,6 +14,8 @@ import {
     generateQuizAnalysis,
     QuizAnalysis
 } from './config';
+import { audioRecorder } from '../../../services/audioRecorder';
+import { transcribeAudio } from '../../../services/apiService';
 
 export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
     const {
@@ -45,6 +47,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const [selectedText, setSelectedText] = useState<string | null>(null);
     const [selectionInfo, setSelectionInfo] = useState<{ top: number; left: number } | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const [showGpsCard, setShowGpsCard] = useState(false);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
@@ -146,10 +149,48 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         completeCoachingTask();
     };
 
-    const handleVoiceComplete = () => {
-        setStudentVoiceAnswer("我选A是因为原文说了beautiful...");
+    // 开始录音
+    const handleStartRecording = async () => {
+        const started = await audioRecorder.startRecording();
+        if (started) {
+            setIsRecording(true);
+        } else {
+            addMessage({ role: 'student', text: '🎙️ 麦克风权限获取失败' });
+        }
+    };
+
+    // 停止录音并转写
+    const handleStopRecording = async () => {
         setIsRecording(false);
-        completeCoachingTask();
+        setIsTranscribing(true);
+
+        try {
+            const audioBlob = await audioRecorder.stopRecording();
+            if (!audioBlob) {
+                setIsTranscribing(false);
+                return;
+            }
+
+            console.log('[Voice] Audio recorded, size:', audioBlob.size);
+
+            // 调用 STT API
+            const result = await transcribeAudio(audioBlob, 'zh');
+
+            if (result.success && result.transcript) {
+                console.log('[Voice] Transcript:', result.transcript);
+                setStudentVoiceAnswer(result.transcript);
+                addMessage({ role: 'student', text: result.transcript });
+                completeCoachingTask();
+            } else {
+                console.error('[Voice] Transcription failed:', result.error);
+                addMessage({ role: 'student', text: '🎙️ 语音识别失败，请重试' });
+            }
+        } catch (error) {
+            console.error('[Voice] Error:', error);
+            addMessage({ role: 'student', text: '🎙️ 录音处理失败' });
+        } finally {
+            setIsTranscribing(false);
+        }
     };
 
     const handleSelectAnswer = (optionId: string) => {
@@ -683,15 +724,18 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
 
                                     {coachingTaskType === 'voice' && (
                                         <button
-                                            onMouseDown={() => setIsRecording(true)}
-                                            onMouseUp={handleVoiceComplete}
-                                            className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isRecording
-                                                ? 'bg-rose-500 text-white scale-[1.02]'
-                                                : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                                            onMouseDown={handleStartRecording}
+                                            onMouseUp={handleStopRecording}
+                                            disabled={isTranscribing}
+                                            className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isTranscribing
+                                                    ? 'bg-slate-300 text-slate-500 cursor-wait'
+                                                    : isRecording
+                                                        ? 'bg-rose-500 text-white scale-[1.02]'
+                                                        : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
                                                 }`}
                                         >
                                             <Mic size={20} />
-                                            {isRecording ? '松开提交' : '按住说话'}
+                                            {isTranscribing ? '识别中...' : isRecording ? '松开提交' : '按住说话'}
                                         </button>
                                     )}
                                 </div>

@@ -2,7 +2,7 @@
 AI Coaching API Router
 实时生成苏格拉底式教学话术
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -494,3 +494,49 @@ async def delete_agent(session_id: str):
     delete_session(session_id)
     
     return {"success": True, "message": "Session deleted successfully"}
+
+
+# ====================
+# STT (Speech-to-Text) API
+# ====================
+
+class TranscribeResponse(BaseModel):
+    success: bool
+    transcript: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post("/transcribe", response_model=TranscribeResponse)
+async def transcribe_audio(
+    audio: UploadFile = File(...),
+    language: str = "zh"
+):
+    """
+    语音转文字 (Groq Whisper)
+    
+    Args:
+        audio: 音频文件 (webm/mp3/wav 等格式)
+        language: 语言代码 (zh=中文, en=英文)
+    
+    Returns:
+        TranscribeResponse: 包含转写文字或错误信息
+    """
+    from services.stt_service import stt_service
+    
+    # 读取音频文件数据
+    audio_data = await audio.read()
+    
+    if len(audio_data) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+    
+    # 调用 STT 服务
+    transcript = await stt_service.transcribe(
+        audio_data=audio_data,
+        filename=audio.filename or "audio.webm",
+        language=language
+    )
+    
+    if transcript:
+        return TranscribeResponse(success=True, transcript=transcript)
+    else:
+        return TranscribeResponse(success=False, error="Transcription failed")

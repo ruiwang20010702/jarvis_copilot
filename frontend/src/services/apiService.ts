@@ -335,3 +335,33 @@ export async function deleteAgent(sessionId: string): Promise<{ success: boolean
         method: 'DELETE',
     });
 }
+
+// ============ STT (Speech-to-Text) API ============
+
+export interface TranscribeResponse {
+    success: boolean;
+    transcript?: string;
+    error?: string;
+}
+
+/**
+ * 语音转文字 (Groq Whisper)
+ * @param audioBlob 录音数据
+ * @param language 语言代码 (默认 zh=中文)
+ */
+export async function transcribeAudio(audioBlob: Blob, language: string = 'zh'): Promise<TranscribeResponse> {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    formData.append('language', language);
+
+    const response = await fetch(`${API_BASE_URL}/api/ai/transcribe`, {
+        method: 'POST',
+        body: formData, // 不设置 Content-Type，让浏览器自动设置 multipart/form-data
+    });
+
+    if (!response.ok) {
+        return { success: false, error: `API Error: ${response.status}` };
+    }
+
+    return response.json();
+}
