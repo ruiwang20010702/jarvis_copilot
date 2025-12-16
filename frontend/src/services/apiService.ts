@@ -159,3 +159,34 @@ export async function saveSessionLog(data: {
         body: JSON.stringify(data),
     });
 }
+
+// ============ AI Coaching Types ============
+
+export interface CoachingScriptRequest {
+    question_id: number;
+    student_answer: string;
+    phase: number; // 1-6
+    student_level?: string;
+    student_name?: string;
+}
+
+export interface CoachingScriptResponse {
+    phase: number;
+    phase_name: string;
+    script: string;
+    suggested_action: string;
+    next_phase: number | null;
+}
+
+/**
+ * 生成 AI Coaching 教学话术
+ */
+export async function generateCoachingScript(
+    params: CoachingScriptRequest
+): Promise<CoachingScriptResponse> {
+    return apiFetch<CoachingScriptResponse>('/api/ai/coaching/generate', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+

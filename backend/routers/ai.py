@@ -187,3 +187,160 @@ async def get_solving_steps(question_type: str):
         "question_type": question_type,
         "solving_steps": steps
     }
+
+
+# 6步教学阶段配置
+COACHING_PHASES = {
+    1: {"name": "归因诊断", "name_en": "Diagnosis", "task_type": "voice"},
+    2: {"name": "技能召回", "name_en": "Recall", "task_type": "gps"},
+    3: {"name": "路标定位", "name_en": "Guide", "task_type": "highlight"},
+    4: {"name": "搜原句", "name_en": "Locate", "task_type": "highlight"},
+    5: {"name": "纠偏锁定", "name_en": "Match", "task_type": "select"},
+    6: {"name": "技巧复盘", "name_en": "Review", "task_type": "review"},
+}
+
+
+class GenerateScriptRequest(BaseModel):
+    question_id: int
+    student_answer: str
+    phase: int = 1  # 当前教学步骤 (1-6)
+    student_level: str = "L0"
+    student_name: str = "Alex"  # 学生名字
+
+
+class GenerateScriptResponse(BaseModel):
+    phase: int
+    phase_name: str
+    script: str
+    suggested_action: str
+    next_phase: Optional[int]
+
+
+@router.post("/coaching/generate", response_model=GenerateScriptResponse)
+async def generate_coaching_script(
+    request: GenerateScriptRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    使用 Gemini AI 实时生成苏格拉底式教学话术
+    """
+    from services.ai_service import ai_service
+    
+    # 获取题目信息
+    result = await db.execute(
+        select(Question).where(Question.id == request.question_id)
+    )
+    question = result.scalars().first()
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    # 获取版本和文章信息
+    version_result = await db.execute(
+        select(Version).where(Version.id == question.version_id)
+    )
+    version = version_result.scalars().first()
+    
+    article_content = ""
+    if version:
+        article_result = await db.execute(
+            select(Article).where(Article.id == version.article_id)
+        )
+        article = article_result.scalars().first()
+        if article:
+            article_content = version.content or article.content
+    
+    # 获取题型对应的解题步骤
+    question_type = question.type or "细节理解题"
+    solving_steps = SOLVING_STEPS.get(question_type, SOLVING_STEPS.get("细节理解题", []))
+    
+    # 获取当前阶段配置
+    phase_config = COACHING_PHASES.get(request.phase, COACHING_PHASES[1])
+    
+    # 读取 prompt 模板
+    prompt_path = os.path.join(os.path.dirname(__file__), "../prompts/coaching_tutor.md")
+    system_prompt = ""
+    if os.path.exists(prompt_path):
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read()
+    
+    # 构建用户 prompt
+    user_prompt = f"""
+请为以下教学场景生成第 {request.phase} 步（{phase_config['name']}）的教学话术。
+
+## 上下文信息
+
+**文章内容**:
+{article_content[:1500]}...
+
+**题目**:
+{question.stem}
+
+**选项**:
+{', '.join(question.options) if question.options else '无'}
+
+**正确答案**: {question.correct_answer}
+**学生选择**: {request.student_answer}
+**学生姓名**: {request.student_name}
+**学生水平**: {request.student_level}
+**题目类型**: {question_type}
+**解题步骤**: {solving_steps}
+
+## 任务要求
+
+生成第 {request.phase} 步「{phase_config['name']}」的话术，要求：
+1. 使用中文，风趣幽默，带 emoji
+2. 不要直接告诉答案
+3. 引导学生自主思考
+4. 话术不要太长，2-4句为佳
+
+请直接输出话术内容，不需要其他格式。
+"""
+    
+    try:
+        # 调用 AI 生成
+        script = await ai_service.generate_text(
+            prompt=user_prompt,
+            system_prompt=system_prompt[:2000] if system_prompt else None,
+            model="gemini"
+        )
+        
+        # 清理可能的格式问题
+        script = script.strip()
+        if script.startswith('"') and script.endswith('"'):
+            script = script[1:-1]
+        
+    except Exception as e:
+        # Fallback 到预设话术
+        print(f"AI generation failed: {e}")
+        fallback_scripts = {
+            1: f"哎呀 {request.student_name}，这道题掉坑里了。🙈\n\n你选了 {request.student_answer}，能悄悄告诉 Jarvis 为什么选它吗？",
+            2: "有道理！但别急，拿出我们的 GPS 卡！🧭\n\n第一步是啥来着？圈路标！",
+            3: "Bingo！路标找得很准 👏\n\n现在，我们要去文章里找'原因'的替身了。",
+            4: "带着路标去扫一扫 🔍\n\n找到那句提到关键信息的话了吗？",
+            5: "真相大白了 💡\n\n再给你一次机会，现在你会选哪个？",
+            6: f"太棒了 {request.student_name}！🎉\n\n我们来复盘一下这道题是怎么解出来的...",
+        }
+        script = fallback_scripts.get(request.phase, "让我们继续下一步...")
+    
+    # 生成建议操作
+    action_map = {
+        "voice": "点击【发布任务】让学生语音回答",
+        "gps": "点击【发布任务】发送GPS卡片",
+        "highlight": "引导学生在文章中画线标记",
+        "select": "展示选项对比，引导学生改选",
+        "review": "展示复盘总结"
+    }
+    suggested_action = action_map.get(phase_config["task_type"], "继续引导")
+    
+    # 计算下一步
+    next_phase = request.phase + 1 if request.phase < 6 else None
+    
+    return GenerateScriptResponse(
+        phase=request.phase,
+        phase_name=phase_config["name"],
+        script=script,
+        suggested_action=suggested_action,
+        next_phase=next_phase
+    )
+

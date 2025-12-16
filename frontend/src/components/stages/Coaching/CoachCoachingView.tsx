@@ -82,6 +82,51 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     // 当前阶段配置
     const currentPhaseConfig = getPhaseConfig(coachingPhase);
 
+    // AI 生成的话术
+    const [aiScript, setAiScript] = useState<string | null>(null);
+    const [aiScriptLoading, setAiScriptLoading] = useState(false);
+
+    // 获取当前错题信息
+    const currentWrongQuestion = useMemo(() => {
+        const wrongItem = quizAnalysis.find(q => q.status === 'wrong');
+        if (wrongItem) {
+            const quiz = articleData.quiz.find(q => q.id === wrongItem.questionId);
+            return quiz ? { ...quiz, studentAnswer: wrongItem.studentAnswer } : null;
+        }
+        return null;
+    }, [quizAnalysis, articleData.quiz]);
+
+    // 加载 AI 话术（当 phase 变化或进入 coaching 时）
+    useEffect(() => {
+        const loadAiScript = async () => {
+            if (!currentWrongQuestion || coachingPhase < 1) {
+                setAiScript(null);
+                return;
+            }
+
+            setAiScriptLoading(true);
+            try {
+                const { generateCoachingScript } = await import('../../../../src/services/apiService');
+                const result = await generateCoachingScript({
+                    question_id: currentWrongQuestion.id,
+                    student_answer: currentWrongQuestion.studentAnswer,
+                    phase: coachingPhase,
+                    student_level: 'L0',
+                    student_name: 'Alex'
+                });
+                setAiScript(result.script);
+            } catch (error) {
+                console.error('[Coaching] Failed to load AI script:', error);
+                // Fallback 到配置中的固定话术
+                setAiScript(null);
+            } finally {
+                setAiScriptLoading(false);
+            }
+        };
+
+        loadAiScript();
+    }, [coachingPhase, currentWrongQuestion]);
+
     // 判断是否可以发布任务
     const canPublishTask = coachingPhase > 0 && !coachingTaskType;
 
@@ -508,7 +553,11 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                                 {currentPhaseConfig.jarvisTitle}
                                             </div>
                                             <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                                                {currentPhaseConfig.jarvisScript}
+                                                {aiScriptLoading ? (
+                                                    <span className="text-slate-400">✨ Jarvis 正在思考...</span>
+                                                ) : (
+                                                    aiScript || currentPhaseConfig.jarvisScript
+                                                )}
                                             </p>
                                             {currentPhaseConfig.jarvisAction && !jarvisAnalysis && (
                                                 <div className="text-xs text-slate-500 bg-white/50 rounded-lg p-2 mt-2">
