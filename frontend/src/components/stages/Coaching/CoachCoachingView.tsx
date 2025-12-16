@@ -132,8 +132,8 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         loadAiScript();
     }, [coachingPhase, currentWrongQuestion, questionIndex]);
 
-    // 判断是否可以发布任务
-    const canPublishTask = coachingPhase > 0 && !coachingTaskType;
+    // 判断是否可以发布任务（Jarvis 思考完成后才显示按钮）
+    const canPublishTask = coachingPhase > 0 && !coachingTaskType && !aiScriptLoading;
 
     // 监听任务完成，触发Jarvis分析
     useEffect(() => {
@@ -599,11 +599,10 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                             </button>
                         ) : (
                             <>
-                                {!coachingTaskType && (
+                                {canPublishTask && (
                                     <button
                                         onClick={handlePublishTask}
-                                        disabled={!canPublishTask}
-                                        className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
                                         style={{ background: 'linear-gradient(135deg, #00B4EE 0%, #0088CC 100%)' }}
                                     >
                                         {currentPhaseConfig && getTaskIcon(currentPhaseConfig.taskType)}
