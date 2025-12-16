@@ -49,6 +49,7 @@ const SYNC_KEYS = [
     'studentHighlights',
     'gpsCardReceived',
     'studentVoiceAnswer',
+    'coachingReselectedAnswer',
     // Vocab Phase 4 State
     'vocabList',
     'vocabStatus',
