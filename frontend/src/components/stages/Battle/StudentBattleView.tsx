@@ -167,8 +167,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     };
 
     const confirmLookup = () => {
-        if (selectedText && lookups.length < lookupLimit) {
-            addLookup(selectedText);
+        if (selectedText && lookups.length < lookupLimit && selectedLocation) {
+            // 获取包含该单词的段落作为上下文
+            const context = articleData.paragraphs[selectedLocation.paragraphIndex] || '';
+            addLookup(selectedText, context);
             setLookupWord(selectedText);
             setSelectionRect(null);
             window.getSelection()?.removeAllRanges();
@@ -183,7 +185,9 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const handleWordLookup = () => {
         if (clickedWord && lookups.length < lookupLimit) {
-            addLookup(clickedWord.word);
+            // 获取包含该单词的段落作为上下文
+            const context = articleData.paragraphs[clickedWord.paragraphIndex] || '';
+            addLookup(clickedWord.word, context);
             setLookupWord(clickedWord.word);
             setClickedWord(null);
         }

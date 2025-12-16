@@ -74,7 +74,7 @@ interface GameStore {
 
   // Battle State
   lookupLimit: number;
-  lookups: string[];
+  lookups: { word: string; context: string }[];
   highlights: Highlight[];
   quizAnswers: QuizAnswer[];
   scrollProgress: number; // 0-100
@@ -146,7 +146,7 @@ interface GameStore {
   setQuickReplies: (replies: string[]) => void;
 
   // Battle Actions
-  addLookup: (word: string) => void;
+  addLookup: (word: string, context?: string) => void;
   addHighlight: (text: string) => void;
   removeHighlight: (id: string) => void;
   setQuizAnswer: (qId: number, oId: string, isUnsure: boolean) => void;
@@ -426,11 +426,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   })),
   setQuickReplies: (replies) => set({ quickReplies: replies }),
 
-  addLookup: (word) => set((state) => {
-    if (state.currentStage !== 'coaching' && (state.lookups.length >= state.lookupLimit || state.lookups.includes(word))) {
+  addLookup: (word: string, context?: string) => set((state) => {
+    if (state.currentStage !== 'coaching' && (state.lookups.length >= state.lookupLimit || state.lookups.some(l => l.word === word))) {
       return state;
     }
-    return { lookups: [...state.lookups, word] };
+    return { lookups: [...state.lookups, { word, context: context || '' }] };
   }),
   addHighlight: (text) => set((state) => ({
     highlights: [...state.highlights, { id: Math.random().toString(36).substring(7), text, color: 'yellow' }]
@@ -485,23 +485,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const vocabItems: VocabItem[] = [];
     const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
 
-    for (const word of lookups) {
+    for (const lookup of lookups) {
       try {
-        const result = await lookupWord(word);
+        const result = await lookupWord(lookup.word, lookup.context);
         vocabItems.push(transformLookupResult(result));
-        vocabStatus[word] = 'unseen';
+        vocabStatus[lookup.word] = 'unseen';
       } catch (error) {
-        console.error('[Store] Failed to lookup word:', word, error);
+        console.error('[Store] Failed to lookup word:', lookup.word, error);
         // Fallback to basic vocab item
         vocabItems.push({
-          word,
-          syllables: [word],
-          definition: `Definition for '${word}' not available`,
+          word: lookup.word,
+          syllables: [lookup.word],
+          definition: `Definition for '${lookup.word}' not available`,
           contextSentence: '',
           mnemonic: '',
           audioSrc: '',
         });
-        vocabStatus[word] = 'unseen';
+        vocabStatus[lookup.word] = 'unseen';
       }
     }
 

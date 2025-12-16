@@ -113,12 +113,14 @@ export async function fetchArticles(skip = 0, limit = 10) {
 }
 
 /**
- * 查词接口
+ * 查词接口 - 增强版
+ * @param word 要查询的单词
+ * @param contextSentence 学生划词时的原句（用于语境翻译）
  */
-export async function lookupWord(word: string): Promise<VocabLookupResult> {
+export async function lookupWord(word: string, contextSentence?: string): Promise<VocabLookupResult> {
     return apiFetch<VocabLookupResult>('/api/vocab/lookup', {
         method: 'POST',
-        body: JSON.stringify({ word }),
+        body: JSON.stringify({ word, context_sentence: contextSentence }),
     });
 }
 
