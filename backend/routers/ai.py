@@ -349,3 +349,148 @@ async def generate_coaching_script(
         question_stem=question.stem if question else ""
     )
 
+
+# ============================================================================
+# Agent API Endpoints - 有状态的 AI 教学助手
+# ============================================================================
+
+class AgentInitRequest(BaseModel):
+    """初始化 Agent 请求"""
+    module_type: str  # coaching | skill | vocab | surgery
+    context: Dict  # 模块特定上下文
+
+
+class AgentInitResponse(BaseModel):
+    """初始化 Agent 响应"""
+    session_id: str
+    initial_action: Dict
+    state: Dict
+
+
+class AgentInputRequest(BaseModel):
+    """处理学生输入请求"""
+    session_id: str
+    input_type: str  # voice_response | highlight | select_option | task_completed
+    input_data: Dict
+
+
+class AgentInputResponse(BaseModel):
+    """处理学生输入响应"""
+    action: Dict
+    state: Dict
+
+
+@router.post("/agent/init", response_model=AgentInitResponse)
+async def init_agent(request: AgentInitRequest):
+    """
+    初始化 Agent 会话
+    
+    创建一个新的 Agent 实例并返回初始动作
+    """
+    from services.agents import create_agent
+    from services.agents.base_agent import save_session, generate_session_id
+    
+    # 生成会话 ID
+    session_id = generate_session_id()
+    
+    try:
+        # 创建 Agent
+        agent = create_agent(
+            module_type=request.module_type,
+            session_id=session_id,
+            context=request.context
+        )
+        
+        # 初始化并获取第一个动作
+        initial_action = await agent.initialize()
+        
+        # 保存会话
+        save_session(agent)
+        
+        return AgentInitResponse(
+            session_id=session_id,
+            initial_action=initial_action.to_dict(),
+            state=agent.get_state()
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent initialization failed: {str(e)}")
+
+
+@router.post("/agent/input", response_model=AgentInputResponse)
+async def process_agent_input(request: AgentInputRequest):
+    """
+    处理学生输入
+    
+    将学生的输入传递给 Agent，返回 Agent 的下一步动作
+    """
+    from services.agents.base_agent import get_session, save_session
+    
+    # 获取会话
+    agent = get_session(request.session_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    try:
+        # 处理输入
+        action = await agent.process_input(
+            input_type=request.input_type,
+            input_data=request.input_data
+        )
+        
+        # 保存更新后的会话
+        save_session(agent)
+        
+        return AgentInputResponse(
+            action=action.to_dict(),
+            state=agent.get_state()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent processing failed: {str(e)}")
+
+
+@router.get("/agent/state/{session_id}")
+async def get_agent_state(session_id: str):
+    """
+    获取 Agent 会话状态
+    """
+    from services.agents.base_agent import get_session
+    
+    agent = get_session(session_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return agent.get_state()
+
+
+@router.post("/agent/reset/{session_id}")
+async def reset_agent(session_id: str):
+    """
+    重置 Agent 会话
+    """
+    from services.agents.base_agent import get_session, save_session
+    
+    agent = get_session(session_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    agent.reset()
+    save_session(agent)
+    
+    return {"success": True, "message": "Session reset successfully"}
+
+
+@router.delete("/agent/{session_id}")
+async def delete_agent(session_id: str):
+    """
+    删除 Agent 会话
+    """
+    from services.agents.base_agent import delete_session, get_session
+    
+    if not get_session(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    delete_session(session_id)
+    
+    return {"success": True, "message": "Session deleted successfully"}
