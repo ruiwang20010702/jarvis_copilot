@@ -168,8 +168,8 @@ export function transformLookupResult(result: VocabLookupResult): VocabItem {
         syllables: result.syllables || [],
         definition: result.definition,
         contextSentence: result.example || '',
-        mnemonic: '', // 需要 AI 生成
-        audioSrc: '', // 需要 TTS
+        mnemonic: result.ai_memory_hint || '',
+        audioSrc: result.audio_url || '',
         phonetic: result.phonetic,
     };
 }

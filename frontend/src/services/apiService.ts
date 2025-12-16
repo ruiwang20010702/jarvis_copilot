@@ -92,6 +92,8 @@ export interface VocabLookupResult {
     definition: string;
     syllables: string[];
     example: string;
+    audio_url?: string;
+    ai_memory_hint?: string;
 }
 
 // ============ API Functions ============

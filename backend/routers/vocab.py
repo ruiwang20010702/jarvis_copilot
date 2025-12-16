@@ -20,6 +20,8 @@ class VocabLookupResponse(BaseModel):
     definition: Optional[str] = None
     syllables: List[str] = []
     example: Optional[str] = None
+    audio_url: Optional[str] = None
+    ai_memory_hint: Optional[str] = None
 
 
 @router.post("/lookup", response_model=VocabLookupResponse)
@@ -44,6 +46,8 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
             definition=vocab_card.definition,
             syllables=vocab_card.syllables or [],
             example=vocab_card.context_sentence,
+            audio_url=vocab_card.audio_url,
+            ai_memory_hint=vocab_card.ai_memory_hint,
         )
     
     # 如果数据库没有，返回基础信息
@@ -54,4 +58,6 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
         definition=f"Definition for '{word}' not found in database",
         syllables=[],
         example=None,
+        audio_url=None,
+        ai_memory_hint=None,
     )
