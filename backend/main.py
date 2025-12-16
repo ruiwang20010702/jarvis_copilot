@@ -4,7 +4,7 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from routers import users, articles, sessions, websocket, vocab
+from routers import users, articles, sessions, websocket, vocab, ai
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +30,7 @@ app.include_router(articles.router)
 app.include_router(sessions.router)
 app.include_router(websocket.router)
 app.include_router(vocab.router)
+app.include_router(ai.router)
 
 @app.get("/")
 async def root():
