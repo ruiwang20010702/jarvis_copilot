@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { fetchVersion, lookupWord } from './src/services/apiService';
-import { transformVersion, transformLookupResult } from './src/services/dataTransform';
+import { transformVersion, transformLookupResult, transformSentenceSurgery } from './src/services/dataTransform';
 
 export type UserRole = 'student' | 'coach' | null;
 
@@ -454,7 +454,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       const apiVersion = await fetchVersion(articleId, level);
       const articleData = transformVersion(apiVersion);
-      set({ articleData, isLoading: false });
+
+      // 转换难句数据（取第一个难句作为默认）
+      let surgeryChunks = INITIAL_SURGERY_CHUNKS;
+      if (apiVersion.sentence_surgeries && apiVersion.sentence_surgeries.length > 0) {
+        const firstSurgery = transformSentenceSurgery(apiVersion.sentence_surgeries[0]);
+        surgeryChunks = firstSurgery.chunks;
+        console.log('[Store] Loaded surgery chunks:', surgeryChunks);
+      }
+
+      set({ articleData, surgeryChunks, isLoading: false });
       console.log('[Store] Loaded version:', articleId, level, articleData);
     } catch (error) {
       console.error('[Store] Failed to load version:', error);
