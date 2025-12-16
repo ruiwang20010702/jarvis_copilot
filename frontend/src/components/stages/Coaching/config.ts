@@ -72,6 +72,47 @@ export const DEMO_QUIZ_ANALYSIS: QuizAnalysis[] = [
   }
 ];
 
+// 从 store 数据生成 Quiz 分析结果
+export interface GenerateQuizAnalysisParams {
+  quiz: Array<{
+    id: number;
+    question: string;
+    options: Array<{ id: string; text: string }>;
+    correctOption: string;
+  }>;
+  quizAnswers: Array<{
+    questionId: number;
+    optionId: string;
+    isUnsure: boolean;
+  }>;
+}
+
+export function generateQuizAnalysis(params: GenerateQuizAnalysisParams): QuizAnalysis[] {
+  const { quiz, quizAnswers } = params;
+
+  return quiz.map((q) => {
+    const answer = quizAnswers.find(a => a.questionId === q.id);
+    const studentAnswer = answer?.optionId || '';
+    const isCorrect = studentAnswer === q.correctOption;
+    const isGuessed = isCorrect && (answer?.isUnsure || false);
+
+    let status: 'correct' | 'wrong' | 'guessed' = 'wrong';
+    if (isCorrect) {
+      status = isGuessed ? 'guessed' : 'correct';
+    }
+
+    return {
+      questionId: q.id,
+      question: q.question,
+      studentAnswer,
+      correctAnswer: q.correctOption,
+      isCorrect,
+      isGuessed,
+      status
+    };
+  });
+}
+
 // 6步教学剧本配置
 export interface CoachingPhaseConfig {
   phase: number;

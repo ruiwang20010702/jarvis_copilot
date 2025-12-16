@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
@@ -10,47 +10,15 @@ import {
 import {
     COACHING_DEMO_QUESTION,
     DEMO_QUIZ_ANALYSIS,
-    getPhaseConfig
+    getPhaseConfig,
+    generateQuizAnalysis,
+    QuizAnalysis
 } from './config';
-
-// 完整的题目选项数据
-const FULL_QUIZ_OPTIONS = [
-    {
-        questionId: 1,
-        question: "What is the main concern about youth basketball?",
-        options: [
-            { id: "A", text: "It lacks qualified coaches." },
-            { id: "B", text: "It leads to overuse injuries and burnout." },
-            { id: "C", text: "It focuses too much on school grades." },
-            { id: "D", text: "It has become too easy to get scholarships." }
-        ],
-        studentAnswer: "B",
-        correctAnswer: "B"
-    },
-    {
-        questionId: 2,
-        question: "Why did Susan buy the scarf?",
-        options: COACHING_DEMO_QUESTION.options,
-        studentAnswer: "A",
-        correctAnswer: "B"
-    },
-    {
-        questionId: 3,
-        question: "Which word best describes the author's tone?",
-        options: [
-            { id: "A", text: "Skeptical" },
-            { id: "B", text: "Affirmative" },
-            { id: "C", text: "Indifferent" },
-            { id: "D", text: "Hostile" }
-        ],
-        studentAnswer: "B",
-        correctAnswer: "B"
-    }
-];
 
 export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
     const {
         articleData,
+        quizAnswers,
         focusParagraphIndex,
         coachingPhase,
         coachingTaskType,
@@ -78,7 +46,41 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const [isRecording, setIsRecording] = useState(false);
     const [showGpsCard, setShowGpsCard] = useState(false);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-    const [expandedQuestion, setExpandedQuestion] = useState<number | null>(2);
+    const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+
+    // 从 store 生成 quiz 分析数据
+    const quizAnalysis = useMemo(() => {
+        if (articleData.quiz.length > 0 && quizAnswers.length > 0) {
+            const analysis = generateQuizAnalysis({
+                quiz: articleData.quiz,
+                quizAnswers
+            });
+            // 默认展开第一道错题
+            const firstWrong = analysis.find(q => q.status === 'wrong' || q.status === 'guessed');
+            if (firstWrong && expandedQuestion === null) {
+                setExpandedQuestion(firstWrong.questionId);
+            }
+            return analysis;
+        }
+        return DEMO_QUIZ_ANALYSIS;
+    }, [articleData.quiz, quizAnswers]);
+
+    // 从 store 生成完整的题目选项数据
+    const fullQuizOptions = useMemo(() => {
+        if (articleData.quiz.length > 0) {
+            return articleData.quiz.map(q => {
+                const answer = quizAnswers.find(a => a.questionId === q.id);
+                return {
+                    questionId: q.id,
+                    question: q.question,
+                    options: q.options,
+                    studentAnswer: answer?.optionId || '',
+                    correctAnswer: q.correctOption
+                };
+            });
+        }
+        return [];
+    }, [articleData.quiz, quizAnswers]);
 
     const currentPhaseConfig = getPhaseConfig(coachingPhase);
 
@@ -237,10 +239,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                 key={paraIndex}
                 ref={el => { if (el) paraRefs.current[paraIndex] = el; }}
                 className={`mb-6 text-lg leading-relaxed font-serif transition-all duration-500 ${isFocused
-                        ? 'text-slate-900 font-medium scale-[1.02] origin-left'
-                        : isBlur
-                            ? 'text-slate-300 opacity-50 blur-[0.5px] scale-[0.98]'
-                            : 'text-slate-700'
+                    ? 'text-slate-900 font-medium scale-[1.02] origin-left'
+                    : isBlur
+                        ? 'text-slate-300 opacity-50 blur-[0.5px] scale-[0.98]'
+                        : 'text-slate-700'
                     } ${coachingTaskType === 'highlight' && coachingTaskReceived && isFocused ? 'cursor-text select-text' : ''}`}
             >
                 {content}
@@ -248,7 +250,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         );
     };
 
-    const renderQuestionOptions = (quiz: typeof FULL_QUIZ_OPTIONS[0], analysis: typeof DEMO_QUIZ_ANALYSIS[0]) => {
+    const renderQuestionOptions = (quiz: typeof fullQuizOptions[0], analysis: typeof quizAnalysis[0]) => {
         return (
             <div className="mt-3 space-y-2">
                 {quiz.options.map(opt => {
@@ -259,10 +261,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                         <div
                             key={opt.id}
                             className={`p-3 rounded-lg border flex justify-between items-center text-sm ${isStudentAnswer && !isCorrect
-                                    ? 'bg-rose-50 border-rose-200 text-rose-700'
-                                    : isCorrect
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                        : 'bg-slate-50 border-slate-100 text-slate-500'
+                                ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                : isCorrect
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-slate-50 border-slate-100 text-slate-500'
                                 }`}
                         >
                             <div className="flex gap-2">
@@ -388,8 +390,8 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                     <button
                         onClick={() => setActiveTab('article')}
                         className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'article'
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                             }`}
                     >
                         <BookOpen size={16} />
@@ -398,8 +400,8 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                     <button
                         onClick={() => setActiveTab('analysis')}
                         className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all border ${activeTab === 'analysis'
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                             }`}
                     >
                         <BarChart3 size={16} />
@@ -439,30 +441,31 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                 <h2 className="text-xl font-bold text-slate-800">我的做题分析</h2>
                                 <div className="flex items-center gap-4 text-sm">
                                     <span className="flex items-center gap-1.5 text-emerald-600">
-                                        <CheckCircle2 size={16} /> 正确 1
+                                        <CheckCircle2 size={16} /> 正确 {quizAnalysis.filter(q => q.status === 'correct').length}
                                     </span>
                                     <span className="flex items-center gap-1.5 text-rose-600">
-                                        <X size={16} /> 错误 1
+                                        <X size={16} /> 错误 {quizAnalysis.filter(q => q.status === 'wrong').length}
                                     </span>
                                     <span className="flex items-center gap-1.5 text-amber-600">
-                                        <HelpCircle size={16} /> 蒙对 1
+                                        <HelpCircle size={16} /> 蒙对 {quizAnalysis.filter(q => q.status === 'guessed').length}
                                     </span>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
-                                {DEMO_QUIZ_ANALYSIS.map((item, idx) => {
-                                    const fullQuiz = FULL_QUIZ_OPTIONS[idx];
+                                {quizAnalysis.map((item, idx) => {
+                                    const fullQuiz = fullQuizOptions[idx];
+                                    if (!fullQuiz) return null;
                                     const isExpanded = expandedQuestion === item.questionId;
 
                                     return (
                                         <div
                                             key={item.questionId}
                                             className={`rounded-2xl border-2 transition-all overflow-hidden ${item.status === 'wrong'
-                                                    ? 'bg-rose-50/50 border-rose-200'
-                                                    : item.status === 'guessed'
-                                                        ? 'bg-amber-50/50 border-amber-200'
-                                                        : 'bg-emerald-50/30 border-emerald-200'
+                                                ? 'bg-rose-50/50 border-rose-200'
+                                                : item.status === 'guessed'
+                                                    ? 'bg-amber-50/50 border-amber-200'
+                                                    : 'bg-emerald-50/30 border-emerald-200'
                                                 }`}
                                         >
                                             <div
@@ -480,10 +483,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <div className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'wrong'
-                                                                ? 'bg-rose-100 text-rose-700'
-                                                                : item.status === 'guessed'
-                                                                    ? 'bg-amber-100 text-amber-700'
-                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                            ? 'bg-rose-100 text-rose-700'
+                                                            : item.status === 'guessed'
+                                                                ? 'bg-amber-100 text-amber-700'
+                                                                : 'bg-emerald-100 text-emerald-700'
                                                             }`}>
                                                             {item.status === 'wrong' ? '错误' : item.status === 'guessed' ? '蒙对' : '正确'}
                                                         </div>
@@ -556,10 +559,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                         onClick={() => handleSelectAnswer(opt.id)}
                                                         disabled={coachingTaskCompleted}
                                                         className={`w-full p-4 rounded-xl border-2 flex justify-between items-center transition-all ${isCorrect
-                                                                ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                                                                : isSelected && !opt.isCorrect
-                                                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                                                    : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
+                                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                                                            : isSelected && !opt.isCorrect
+                                                                ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
                                                             } ${coachingTaskCompleted ? 'cursor-default' : 'cursor-pointer'}`}
                                                     >
                                                         <div className="flex gap-3">
@@ -681,8 +684,8 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                             onMouseDown={() => setIsRecording(true)}
                                             onMouseUp={handleVoiceComplete}
                                             className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isRecording
-                                                    ? 'bg-rose-500 text-white scale-[1.02]'
-                                                    : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                                                ? 'bg-rose-500 text-white scale-[1.02]'
+                                                : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
                                                 }`}
                                         >
                                             <Mic size={20} />
@@ -732,10 +735,10 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                         >
                                             <div
                                                 className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'student'
-                                                        ? 'bg-[#00B4EE] text-white'
-                                                        : msg.role === 'jarvis'
-                                                            ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
-                                                            : 'bg-slate-100 text-slate-700'
+                                                    ? 'bg-[#00B4EE] text-white'
+                                                    : msg.role === 'jarvis'
+                                                        ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
+                                                        : 'bg-slate-100 text-slate-700'
                                                     }`}
                                             >
                                                 <div className="text-[10px] opacity-60 mb-0.5 font-semibold">
