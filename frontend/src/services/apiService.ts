@@ -193,3 +193,145 @@ export async function generateCoachingScript(
     });
 }
 
+
+// ============ Jarvis Agent API (Stateful) ============
+
+/**
+ * Agent 动作类型
+ */
+export type AgentActionType =
+    | 'SEND_MESSAGE'
+    | 'PUBLISH_TASK'
+    | 'ADVANCE_PHASE'
+    | 'START_REVIEW'
+    | 'SHOW_GPS_CARD'
+    | 'SHOW_WORD_CARD'
+    | 'SHOW_CHUNKS'
+    | 'PLAY_AUDIO'
+    | 'COMPLETE';
+
+/**
+ * Agent 动作
+ */
+export interface AgentAction {
+    type: AgentActionType;
+    payload: {
+        text?: string;
+        require_task?: boolean;
+        task_type?: 'voice' | 'highlight' | 'select' | 'gps' | 'review';
+        phase?: number;
+        phase_name?: string;
+        is_correct?: boolean;
+        forced_review?: boolean;
+        wrong_count?: number;
+        remaining_attempts?: number;
+        [key: string]: any;
+    };
+}
+
+/**
+ * Agent 会话状态
+ */
+export interface AgentState {
+    session_id: string;
+    module_type: string;
+    current_phase: number;
+    wrong_count: number;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * 初始化 Agent 请求
+ */
+export interface AgentInitRequest {
+    module_type: 'coaching' | 'skill' | 'vocab' | 'surgery';
+    context: {
+        question_id?: number;
+        student_answer?: string;
+        correct_answer?: string;
+        student_name?: string;
+        student_level?: string;
+        question_index?: number;
+        question_stem?: string;
+        [key: string]: any;
+    };
+}
+
+/**
+ * 初始化 Agent 响应
+ */
+export interface AgentInitResponse {
+    session_id: string;
+    initial_action: AgentAction;
+    state: AgentState;
+}
+
+/**
+ * 处理学生输入请求
+ */
+export interface AgentInputRequest {
+    session_id: string;
+    input_type: 'voice_response' | 'highlight' | 'select_option' | 'task_completed' | 'word_click';
+    input_data: {
+        transcript?: string;
+        text?: string;
+        paragraph_index?: number;
+        option_id?: string;
+        word?: string;
+        [key: string]: any;
+    };
+}
+
+/**
+ * 处理学生输入响应
+ */
+export interface AgentInputResponse {
+    action: AgentAction;
+    state: AgentState;
+}
+
+/**
+ * 初始化 Jarvis Agent 会话
+ */
+export async function initAgent(params: AgentInitRequest): Promise<AgentInitResponse> {
+    return apiFetch<AgentInitResponse>('/api/ai/agent/init', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
+/**
+ * 处理学生输入，获取 Agent 下一步动作
+ */
+export async function agentInput(params: AgentInputRequest): Promise<AgentInputResponse> {
+    return apiFetch<AgentInputResponse>('/api/ai/agent/input', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
+/**
+ * 获取 Agent 会话状态
+ */
+export async function getAgentState(sessionId: string): Promise<AgentState> {
+    return apiFetch<AgentState>(`/api/ai/agent/state/${sessionId}`);
+}
+
+/**
+ * 重置 Agent 会话
+ */
+export async function resetAgent(sessionId: string): Promise<{ success: boolean; message: string }> {
+    return apiFetch<{ success: boolean; message: string }>(`/api/ai/agent/reset/${sessionId}`, {
+        method: 'POST',
+    });
+}
+
+/**
+ * 删除 Agent 会话
+ */
+export async function deleteAgent(sessionId: string): Promise<{ success: boolean; message: string }> {
+    return apiFetch<{ success: boolean; message: string }>(`/api/ai/agent/${sessionId}`, {
+        method: 'DELETE',
+    });
+}
