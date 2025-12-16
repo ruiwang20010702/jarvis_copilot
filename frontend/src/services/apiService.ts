@@ -2,7 +2,8 @@
  * API Service - 与后端通信的服务层
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// 后端使用 HTTPS，需要匹配
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:8000';
 
 /**
  * 通用 fetch 封装
