@@ -14,6 +14,12 @@ import {
     generateQuizAnalysis,
     QuizAnalysis
 } from './config';
+import {
+    initAgent,
+    agentInput,
+    AgentAction,
+    AgentState
+} from '../../../services/apiService';
 
 export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
     const {
@@ -42,6 +48,10 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     const [selectionInfo, setSelectionInfo] = useState<{ top: number; left: number } | null>(null);
     const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
     const [jarvisAnalysis, setJarvisAnalysis] = useState<string | null>(null);
+
+    // Agent 会话状态
+    const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+    const [pendingTaskType, setPendingTaskType] = useState<string | null>(null);
 
     // 从 store 生成 quiz 分析数据
     const quizAnalysis = useMemo(() => {
@@ -100,56 +110,121 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         return { currentWrongQuestion: null, questionIndex: 0 };
     }, [quizAnalysis, articleData.quiz]);
 
-    // 加载 AI 话术（当 phase 变化或进入 coaching 时）
+    // 初始化 Agent 会话（当进入第 1 阶段时）
     useEffect(() => {
-        const loadAiScript = async () => {
-            if (!currentWrongQuestion || coachingPhase < 1) {
-                setAiScript(null);
+        const initAgentSession = async () => {
+            if (!currentWrongQuestion || coachingPhase !== 1 || agentSessionId) {
                 return;
             }
 
             setAiScriptLoading(true);
             try {
-                const { generateCoachingScript } = await import('../../../../src/services/apiService');
-                const result = await generateCoachingScript({
-                    question_id: currentWrongQuestion.id,
-                    student_answer: currentWrongQuestion.studentAnswer,
-                    phase: coachingPhase,
-                    student_level: 'L0',
-                    student_name: 'Alex',
-                    question_index: questionIndex
+                const response = await initAgent({
+                    module_type: 'coaching',
+                    context: {
+                        question_id: currentWrongQuestion.id,
+                        student_answer: currentWrongQuestion.studentAnswer,
+                        correct_answer: currentWrongQuestion.correctOption,
+                        student_name: 'Alex',
+                        student_level: 'L0',
+                        question_index: questionIndex,
+                        question_stem: currentWrongQuestion.question
+                    }
                 });
-                setAiScript(result.script);
+
+                setAgentSessionId(response.session_id);
+                handleAgentAction(response.initial_action);
+                console.log('[Coaching] Agent session initialized:', response.session_id);
             } catch (error) {
-                console.error('[Coaching] Failed to load AI script:', error);
-                // Fallback 到配置中的固定话术
+                console.error('[Coaching] Failed to init Agent:', error);
                 setAiScript(null);
             } finally {
                 setAiScriptLoading(false);
             }
         };
 
-        loadAiScript();
-    }, [coachingPhase, currentWrongQuestion, questionIndex]);
+        initAgentSession();
+    }, [coachingPhase, currentWrongQuestion, questionIndex, agentSessionId]);
+
+    // 处理 Agent 返回的动作
+    const handleAgentAction = (action: AgentAction) => {
+        console.log('[Coaching] Agent action:', action);
+
+        // 设置话术
+        if (action.payload.text) {
+            setAiScript(action.payload.text);
+        }
+
+        // 设置待发布的任务类型
+        if (action.payload.require_task && action.payload.task_type) {
+            setPendingTaskType(action.payload.task_type);
+        } else {
+            setPendingTaskType(null);
+        }
+
+        // 更新阶段 (由 store 管理)
+        if (action.payload.phase && action.payload.phase !== coachingPhase) {
+            setCoachingPhase(action.payload.phase as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+        }
+
+        // 处理复盘
+        if (action.type === 'START_REVIEW') {
+            setCoachingPhase(6);
+        }
+    };
 
     // 判断是否可以发布任务（Jarvis 思考完成后才显示按钮）
     const canPublishTask = coachingPhase > 0 && !coachingTaskType && !aiScriptLoading;
 
-    // 监听任务完成，触发Jarvis分析
+    // 监听任务完成，调用 Agent 分析学生反馈
     useEffect(() => {
-        if (coachingTaskCompleted && coachingTaskType) {
-            // Mock Jarvis分析
-            if (coachingTaskType === 'highlight') {
-                setJarvisAnalysis("Alex 画线正确！他找到了关键句 'it was on sale'。\n\n建议话术：「很好！你找到了重点，这就是答案的依据。」");
-            } else if (coachingTaskType === 'voice') {
-                setJarvisAnalysis("Alex 回答：「我选A是因为原文说了beautiful...」\n\n分析：学生被干扰项迷惑了。建议引导他关注逻辑词 Why → Because。");
-            } else if (coachingTaskType === 'gps') {
-                setJarvisAnalysis("Alex 已装备GPS卡！\n\n建议话术：「很好，现在让我们用三步法来解决这道题。」");
-            } else if (coachingTaskType === 'select') {
-                setJarvisAnalysis("Alex 改选了正确答案 B！\n\n建议话术：「太棒了！你看，只要找到Because，答案就藏在后面。」");
+        const processTaskCompletion = async () => {
+            if (!coachingTaskCompleted || !coachingTaskType || !agentSessionId) {
+                return;
             }
-        }
-    }, [coachingTaskCompleted, coachingTaskType]);
+
+            setAiScriptLoading(true);
+            try {
+                // 构建输入数据
+                let inputType: 'voice_response' | 'highlight' | 'select_option' | 'task_completed' = 'task_completed';
+                let inputData: Record<string, any> = {};
+
+                if (coachingTaskType === 'voice') {
+                    inputType = 'voice_response';
+                    // 从消息中获取学生回复（如果有）
+                    const lastStudentMsg = messages.filter(m => m.role === 'student').slice(-1)[0];
+                    inputData = { transcript: lastStudentMsg?.text || '学生已完成语音任务' };
+                } else if (coachingTaskType === 'highlight') {
+                    inputType = 'highlight';
+                    const lastHighlight = studentHighlights.slice(-1)[0];
+                    inputData = { text: lastHighlight?.text || '', paragraph_index: lastHighlight?.paragraphIndex || 0 };
+                } else if (coachingTaskType === 'select') {
+                    inputType = 'select_option';
+                    // 这里需要从 store 获取学生的选择
+                    inputData = { option_id: 'B' }; // TODO: 从实际状态获取
+                }
+
+                const response = await agentInput({
+                    session_id: agentSessionId,
+                    input_type: inputType,
+                    input_data: inputData
+                });
+
+                // 显示 Jarvis 分析
+                setJarvisAnalysis(response.action.payload.text || null);
+                handleAgentAction(response.action);
+
+            } catch (error) {
+                console.error('[Coaching] Failed to process task completion:', error);
+                // Fallback 到 mock 分析
+                setJarvisAnalysis('分析完成，请点击下一步继续。');
+            } finally {
+                setAiScriptLoading(false);
+            }
+        };
+
+        processTaskCompletion();
+    }, [coachingTaskCompleted, coachingTaskType, agentSessionId, messages, studentHighlights]);
 
     // 处理教师画线
     const handleTeacherTextSelection = () => {
