@@ -168,6 +168,7 @@ export interface CoachingScriptRequest {
     phase: number; // 1-6
     student_level?: string;
     student_name?: string;
+    question_index?: number; // 题目序号（第几题）
 }
 
 export interface CoachingScriptResponse {
@@ -176,6 +177,8 @@ export interface CoachingScriptResponse {
     script: string;
     suggested_action: string;
     next_phase: number | null;
+    question_index: number; // 题目序号
+    question_stem: string; // 题干内容
 }
 
 /**

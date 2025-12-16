@@ -86,14 +86,18 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     const [aiScript, setAiScript] = useState<string | null>(null);
     const [aiScriptLoading, setAiScriptLoading] = useState(false);
 
-    // 获取当前错题信息
-    const currentWrongQuestion = useMemo(() => {
+    // 获取当前错题信息和序号
+    const { currentWrongQuestion, questionIndex } = useMemo(() => {
         const wrongItem = quizAnalysis.find(q => q.status === 'wrong');
         if (wrongItem) {
             const quiz = articleData.quiz.find(q => q.id === wrongItem.questionId);
-            return quiz ? { ...quiz, studentAnswer: wrongItem.studentAnswer } : null;
+            const index = articleData.quiz.findIndex(q => q.id === wrongItem.questionId) + 1;
+            return {
+                currentWrongQuestion: quiz ? { ...quiz, studentAnswer: wrongItem.studentAnswer } : null,
+                questionIndex: index
+            };
         }
-        return null;
+        return { currentWrongQuestion: null, questionIndex: 0 };
     }, [quizAnalysis, articleData.quiz]);
 
     // 加载 AI 话术（当 phase 变化或进入 coaching 时）
@@ -112,7 +116,8 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                     student_answer: currentWrongQuestion.studentAnswer,
                     phase: coachingPhase,
                     student_level: 'L0',
-                    student_name: 'Alex'
+                    student_name: 'Alex',
+                    question_index: questionIndex
                 });
                 setAiScript(result.script);
             } catch (error) {
@@ -125,7 +130,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         };
 
         loadAiScript();
-    }, [coachingPhase, currentWrongQuestion]);
+    }, [coachingPhase, currentWrongQuestion, questionIndex]);
 
     // 判断是否可以发布任务
     const canPublishTask = coachingPhase > 0 && !coachingTaskType;

@@ -206,6 +206,7 @@ class GenerateScriptRequest(BaseModel):
     phase: int = 1  # 当前教学步骤 (1-6)
     student_level: str = "L0"
     student_name: str = "Alex"  # 学生名字
+    question_index: int = 1  # 题目序号（第几题）
 
 
 class GenerateScriptResponse(BaseModel):
@@ -214,6 +215,8 @@ class GenerateScriptResponse(BaseModel):
     script: str
     suggested_action: str
     next_phase: Optional[int]
+    question_index: int = 1  # 题目序号
+    question_stem: str = ""  # 题干内容
 
 
 @router.post("/coaching/generate", response_model=GenerateScriptResponse)
@@ -314,12 +317,12 @@ async def generate_coaching_script(
         # Fallback 到预设话术
         print(f"AI generation failed: {e}")
         fallback_scripts = {
-            1: f"哎呀 {request.student_name}，这道题掉坑里了。🙈\n\n你选了 {request.student_answer}，能悄悄告诉 Jarvis 为什么选它吗？",
+            1: f"哎呀 {request.student_name}，第 {request.question_index} 题掉坑里了。🙈\n\n你选了 {request.student_answer}，能悄悄告诉 Jarvis 为什么选它吗？",
             2: "有道理！但别急，拿出我们的 GPS 卡！🧭\n\n第一步是啥来着？圈路标！",
             3: "Bingo！路标找得很准 👏\n\n现在，我们要去文章里找'原因'的替身了。",
             4: "带着路标去扫一扫 🔍\n\n找到那句提到关键信息的话了吗？",
             5: "真相大白了 💡\n\n再给你一次机会，现在你会选哪个？",
-            6: f"太棒了 {request.student_name}！🎉\n\n我们来复盘一下这道题是怎么解出来的...",
+            6: f"太棒了 {request.student_name}！🎉\n\n我们来复盘一下第 {request.question_index} 题是怎么解出来的...",
         }
         script = fallback_scripts.get(request.phase, "让我们继续下一步...")
     
@@ -341,6 +344,8 @@ async def generate_coaching_script(
         phase_name=phase_config["name"],
         script=script,
         suggested_action=suggested_action,
-        next_phase=next_phase
+        next_phase=next_phase,
+        question_index=request.question_index,
+        question_stem=question.stem if question else ""
     )
 
