@@ -101,6 +101,7 @@ interface GameStore {
   studentHighlights: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }[]; // 学生黄色画线（做题痕迹）
   gpsCardReceived: boolean; // 学生是否接收了GPS卡
   studentVoiceAnswer: string | null; // 学生语音回答内容
+  coachingReselectedAnswer: string | null; // 学生重新选择的答案 (Phase 5)
 
   // Vocab State (Phase 4)
   vocabList: VocabItem[];
@@ -175,6 +176,7 @@ interface GameStore {
   addStudentHighlight: (highlight: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }) => void;
   receiveGpsCard: () => void;
   setStudentVoiceAnswer: (answer: string | null) => void;
+  setCoachingReselectedAnswer: (answer: string | null) => void;
   resetCoachingState: () => void;
 
   // Vocab Actions
@@ -372,6 +374,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   studentHighlights: [],
   gpsCardReceived: false,
   studentVoiceAnswer: null,
+  coachingReselectedAnswer: null,
 
   // Vocab Defaults
   vocabList: [],
@@ -553,6 +556,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   })),
   receiveGpsCard: () => set({ gpsCardReceived: true }),
   setStudentVoiceAnswer: (answer) => set({ studentVoiceAnswer: answer }),
+  setCoachingReselectedAnswer: (answer) => set({ coachingReselectedAnswer: answer }),
   resetCoachingState: () => set({
     coachingPhase: 0,
     coachingTaskType: null,
@@ -561,6 +565,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     teacherHighlights: [],
     gpsCardReceived: false,
     studentVoiceAnswer: null,
+    coachingReselectedAnswer: null,
     focusParagraphIndex: null
   }),
 

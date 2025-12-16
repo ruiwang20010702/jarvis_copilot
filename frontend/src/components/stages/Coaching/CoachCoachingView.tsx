@@ -37,6 +37,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         addTeacherHighlight,
         setCoachingPhase,
         studentHighlights,
+        coachingReselectedAnswer, // 学生重新选择的答案
         highlights, // 实战阶段的做题痕迹
         addMessage,
         messages,
@@ -201,7 +202,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                 } else if (coachingTaskType === 'select') {
                     inputType = 'select_option';
                     // 这里需要从 store 获取学生的选择
-                    inputData = { option_id: 'B' }; // TODO: 从实际状态获取
+                    inputData = { option_id: coachingReselectedAnswer || '' };
                 }
 
                 const response = await agentInput({

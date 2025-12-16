@@ -32,6 +32,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         addStudentHighlight,
         receiveGpsCard,
         setStudentVoiceAnswer,
+        setCoachingReselectedAnswer,
         highlights, // 实战阶段做题痕迹
         messages,
         addMessage,
@@ -153,6 +154,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
 
     const handleSelectAnswer = (optionId: string) => {
         setSelectedAnswer(optionId);
+        setCoachingReselectedAnswer(optionId); // 同步到 store，供教练端读取
         if (optionId === COACHING_DEMO_QUESTION.correctAnswer) {
             completeCoachingTask();
         }
