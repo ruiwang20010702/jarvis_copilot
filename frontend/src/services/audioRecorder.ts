@@ -7,6 +7,32 @@ export class AudioRecorder {
     private mediaRecorder: MediaRecorder | null = null;
     private audioChunks: Blob[] = [];
     private stream: MediaStream | null = null;
+    private currentMimeType: string = '';
+
+    /**
+     * 获取支持的 MIME 类型
+     */
+    private getSupportedMimeType(): string {
+        // Groq Whisper 支持的格式优先级
+        const mimeTypes = [
+            'audio/mp4',
+            'audio/mpeg',
+            'audio/webm',
+            'audio/webm;codecs=opus',
+            'audio/ogg;codecs=opus',
+            'audio/wav',
+        ];
+
+        for (const mimeType of mimeTypes) {
+            if (MediaRecorder.isTypeSupported(mimeType)) {
+                console.log(`[AudioRecorder] Using MIME type: ${mimeType}`);
+                return mimeType;
+            }
+        }
+
+        console.warn('[AudioRecorder] No preferred MIME type supported, using default');
+        return '';  // 使用浏览器默认
+    }
 
     /**
      * 开始录音
@@ -22,10 +48,14 @@ export class AudioRecorder {
                 }
             });
 
+            // 获取支持的 MIME 类型
+            const mimeType = this.getSupportedMimeType();
+
             // 创建 MediaRecorder
-            this.mediaRecorder = new MediaRecorder(this.stream, {
-                mimeType: 'audio/webm;codecs=opus'
-            });
+            const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
+            this.currentMimeType = this.mediaRecorder.mimeType;
+            console.log(`[AudioRecorder] Actual MIME type: ${this.currentMimeType}`);
 
             this.audioChunks = [];
 
@@ -57,9 +87,9 @@ export class AudioRecorder {
             }
 
             this.mediaRecorder.onstop = () => {
-                // 合并音频数据
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-                console.log(`[AudioRecorder] Recording stopped, size: ${audioBlob.size} bytes`);
+                // 合并音频数据，使用实际录制的 MIME 类型
+                const audioBlob = new Blob(this.audioChunks, { type: this.currentMimeType || 'audio/webm' });
+                console.log(`[AudioRecorder] Recording stopped, size: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
 
                 // 释放麦克风
                 this.cleanup();

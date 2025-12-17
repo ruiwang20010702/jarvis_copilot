@@ -724,18 +724,17 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
 
                                     {coachingTaskType === 'voice' && (
                                         <button
-                                            onMouseDown={handleStartRecording}
-                                            onMouseUp={handleStopRecording}
+                                            onClick={isRecording ? handleStopRecording : handleStartRecording}
                                             disabled={isTranscribing}
                                             className={`mt-4 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isTranscribing
-                                                    ? 'bg-slate-300 text-slate-500 cursor-wait'
-                                                    : isRecording
-                                                        ? 'bg-rose-500 text-white scale-[1.02]'
-                                                        : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                                                ? 'bg-slate-300 text-slate-500 cursor-wait'
+                                                : isRecording
+                                                    ? 'bg-rose-500 text-white scale-[1.02] animate-pulse'
+                                                    : 'bg-rose-100 text-rose-600 hover:bg-rose-200'
                                                 }`}
                                         >
                                             <Mic size={20} />
-                                            {isTranscribing ? '识别中...' : isRecording ? '松开提交' : '按住说话'}
+                                            {isTranscribing ? '识别中...' : isRecording ? '点击结束录音' : '点击开始录音'}
                                         </button>
                                     )}
                                 </div>
