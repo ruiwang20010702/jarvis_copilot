@@ -1,1 +1,10 @@
 backend/.env
+
+# 测试音频
+backend/static/audio/*.mp3
+backend/static/audio/*.wav
+backend/static/audio/*.pcm
+
+# Python 缓存
+__pycache__/
+*.pyc
