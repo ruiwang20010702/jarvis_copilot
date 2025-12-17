@@ -622,10 +622,64 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setVocabCardFlipped: (flipped) => set({ vocabCardFlipped: flipped }),
   toggleSyllableMode: () => set((state) => ({ isSyllableMode: !state.isSyllableMode })),
   playStandardAudio: () => {
-    set({ isPlayingAudio: 'standard' });
-    setTimeout(() => {
-      set({ isPlayingAudio: 'none' });
-    }, 2000);
+    const state = get();
+    const currentCard = state.vocabList[state.currentVocabIndex];
+
+    console.log('[Audio] Playing for:', currentCard?.word, 'audioSrc:', currentCard?.audioSrc);
+
+    if (currentCard?.audioSrc && currentCard.audioSrc.length > 0) {
+      set({ isPlayingAudio: 'standard' });
+
+      // 使用 API 基础 URL 构建完整路径
+      const audioUrl = currentCard.audioSrc.startsWith('http')
+        ? currentCard.audioSrc
+        : `${import.meta.env.VITE_API_URL || 'https://localhost:8000'}${currentCard.audioSrc}`;
+
+      console.log('[Audio] Playing file:', audioUrl);
+      const audio = new Audio(audioUrl);
+      audio.play().then(() => {
+        audio.onended = () => {
+          set({ isPlayingAudio: 'none' });
+        };
+      }).catch((error) => {
+        console.error('[Audio] File playback failed, fallback to TTS:', error);
+        // 文件播放失败，回退到 TTS
+        speakWord(currentCard.word);
+      });
+    } else if (currentCard?.word) {
+      // 没有音频文件，使用浏览器 TTS
+      console.log('[Audio] No audio file, using browser TTS');
+      speakWord(currentCard.word);
+    } else {
+      console.warn('[Audio] No word to play');
+    }
+
+    function speakWord(word: string) {
+      set({ isPlayingAudio: 'standard' });
+      if ('speechSynthesis' in window) {
+        // Chrome 需要先取消之前的语音
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        utterance.onend = () => set({ isPlayingAudio: 'none' });
+        utterance.onerror = (e) => {
+          console.error('[Audio] TTS error:', e);
+          set({ isPlayingAudio: 'none' });
+        };
+
+        // Chrome workaround: 延迟执行
+        setTimeout(() => {
+          window.speechSynthesis.speak(utterance);
+        }, 100);
+
+        console.log('[Audio] TTS speaking:', word);
+      } else {
+        console.warn('[Audio] speechSynthesis not supported');
+        setTimeout(() => set({ isPlayingAudio: 'none' }), 1000);
+      }
+    }
   },
 
   toggleVocabCheck: (word) => set((state) => {

@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 from routers import users, articles, sessions, websocket, vocab, ai
@@ -31,6 +33,12 @@ app.include_router(sessions.router)
 app.include_router(websocket.router)
 app.include_router(vocab.router)
 app.include_router(ai.router)
+
+# Static Files - 为 TTS 音频文件提供服务
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+(static_dir / "audio").mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 @app.get("/")
 async def root():

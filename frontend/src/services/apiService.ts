@@ -369,3 +369,31 @@ export async function transcribeAudio(audioBlob: Blob, language: string = 'zh'):
 
     return response.json();
 }
+
+/**
+ * 发音评估接口
+ * @param audioBlob 录音文件 Blob
+ * @param text 参考文本
+ */
+export async function assessPronunciation(audioBlob: Blob, text: string): Promise<{
+    accuracy: number;
+    fluency: number;
+    completeness: number;
+    overall: number;
+    error?: string;
+}> {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.wav');
+    formData.append('text', text);
+
+    const response = await fetch(`${API_BASE_URL}/api/ai/pronunciation`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+    }
+
+    return response.json();
+}

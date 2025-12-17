@@ -2,7 +2,7 @@
 AI Coaching API Router
 实时生成苏格拉底式教学话术
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -540,3 +540,62 @@ async def transcribe_audio(
         return TranscribeResponse(success=True, transcript=transcript)
     else:
         return TranscribeResponse(success=False, error="Transcription failed")
+
+
+# ====================
+# Pronunciation Assessment API
+# ====================
+
+class PronunciationResponse(BaseModel):
+    accuracy: float
+    fluency: float
+    completeness: float
+    overall: float
+    error: Optional[str] = None
+
+
+@router.post("/pronunciation", response_model=PronunciationResponse)
+async def assess_pronunciation(
+    audio: UploadFile = File(...),
+    text: str = Form(...)
+):
+    """
+    发音评估 (Azure Speech)
+    
+    Args:
+        audio: 音频文件 (wav/webm 等)
+        text: 参考文本 (单词或句子)
+    
+    Returns:
+        PronunciationResponse: 包含准确度、流利度、完整度和综合评分
+    """
+    from services.pronunciation_service import pronunciation_service
+    import tempfile
+    
+    # 保存临时文件
+    # Azure SDK 需要文件路径
+    suffix = os.path.splitext(audio.filename)[1] if audio.filename else ".wav"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+        content = await audio.read()
+        temp_audio.write(content)
+        temp_audio_path = temp_audio.name
+    
+    try:
+        # 调用评估服务
+        result = await pronunciation_service.assess_pronunciation(
+            audio_path=temp_audio_path,
+            reference_text=text
+        )
+        
+        return PronunciationResponse(
+            accuracy=result.get("accuracy", 0),
+            fluency=result.get("fluency", 0),
+            completeness=result.get("completeness", 0),
+            overall=result.get("overall", 0),
+            error=result.get("error")
+        )
+        
+    finally:
+        # 清理临时文件
+        if os.path.exists(temp_audio_path):
+            os.unlink(temp_audio_path)

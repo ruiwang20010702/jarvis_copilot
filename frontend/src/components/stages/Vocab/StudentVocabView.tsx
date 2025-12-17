@@ -6,6 +6,8 @@ import {
     Volume2, Mic, RotateCw, CheckCircle2, ArrowRight,
     Clock, Trophy, ListChecks, Check, Sparkles, Lightbulb, RefreshCcw
 } from 'lucide-react';
+import { audioRecorder } from '../../../services/audioRecorder';
+import { assessPronunciation } from '../../../services/apiService';
 
 /**
  * 学生端生词学习组件
@@ -67,26 +69,39 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         }
     }, [isPlayingAudio]);
 
-    const handleRecordStart = (e: React.SyntheticEvent) => {
+    // 点击切换录音状态
+    const handleRecordToggle = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (recordingState === 'finished') return;
-        setRecordingState('recording');
-    };
 
-    const handleRecordEnd = (e: React.SyntheticEvent) => {
-        e.preventDefault();
-        if (recordingState !== 'recording') return;
+        if (recordingState === 'idle') {
+            // 开始录音
+            try {
+                await audioRecorder.startRecording();
+                setRecordingState('recording');
+            } catch (error) {
+                console.error('Failed to start recording:', error);
+            }
+        } else if (recordingState === 'recording') {
+            // 结束录音并评分
+            try {
+                const audioBlob = await audioRecorder.stopRecording();
+                setRecordingState('playing_user'); // 显示"正在评分"状态
 
-        setRecordingState('playing_user');
-        setTimeout(() => {
-            setRecordingState('playing_standard');
-            setTimeout(() => {
-                const mockScore = 85 + Math.floor(Math.random() * 11);
-                setScore(mockScore);
-                setRecordingState('finished');
-                setVocabCardFlipped(true);
-            }, 1500);
-        }, 1500);
+                // 调用评分 API
+                if (currentCard?.word) {
+                    const result = await assessPronunciation(audioBlob, currentCard.word);
+                    console.log('Pronunciation result:', result);
+
+                    setScore(Math.round(result.overall));
+                    setRecordingState('finished');
+                    setVocabCardFlipped(true);
+                }
+            } catch (error) {
+                console.error('Failed to stop recording or assess:', error);
+                setRecordingState('idle');
+            }
+        }
     };
 
     const syllableColors = [
@@ -296,20 +311,24 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                 }}
                             >
                                 <button
-                                    onPointerDown={handleRecordStart}
-                                    onPointerUp={handleRecordEnd}
-                                    onPointerLeave={handleRecordEnd}
-                                    disabled={!vocabSpeakEnabled || recordingState === 'finished'}
+                                    onClick={handleRecordToggle}
+                                    disabled={!vocabSpeakEnabled || recordingState === 'finished' || recordingState === 'playing_user'}
                                     className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${!vocabSpeakEnabled
-                                            ? 'bg-slate-300 cursor-not-allowed shadow-md'
-                                            : recordingState === 'recording'
-                                                ? 'bg-red-500 shadow-xl shadow-red-500/40 scale-110'
+                                        ? 'bg-slate-300 cursor-not-allowed shadow-md'
+                                        : recordingState === 'recording'
+                                            ? 'bg-red-500 shadow-xl shadow-red-500/40 scale-110 animate-pulse'
+                                            : recordingState === 'playing_user'
+                                                ? 'bg-amber-500 shadow-xl shadow-amber-500/40'
                                                 : recordingState === 'finished'
                                                     ? 'bg-emerald-500 shadow-xl shadow-emerald-500/40'
                                                     : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-xl'
                                         }`}
                                 >
-                                    <Mic size={28} className="text-white" />
+                                    {recordingState === 'recording' ? (
+                                        <div className="w-6 h-6 bg-white rounded-sm" /> /* 录音中显示停止方块 */
+                                    ) : (
+                                        <Mic size={28} className="text-white" />
+                                    )}
                                 </button>
                             </div>
                         )}
@@ -360,8 +379,8 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                         className="absolute bottom-8 left-0 w-full flex justify-center z-20"
                     >
                         <div className={`px-8 py-3 rounded-full font-bold text-lg shadow-xl flex items-center gap-3 ${score >= 80
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-amber-500 text-white'
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-amber-500 text-white'
                             }`}>
                             {score >= 80 ? '🎉' : '💪'} 得分: {score}
                         </div>
@@ -392,8 +411,8 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.1 }}
                                 className={`group flex items-center justify-between p-6 rounded-2xl border transition-all ${isMastered
-                                        ? 'bg-emerald-50/50 border-emerald-100 shadow-none'
-                                        : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200'
+                                    ? 'bg-emerald-50/50 border-emerald-100 shadow-none'
+                                    : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200'
                                     }`}
                             >
                                 <div className="flex-1 flex items-center gap-6">
@@ -412,8 +431,8 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
 
                                 <div
                                     className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all pointer-events-none ${isMastered
-                                            ? 'bg-emerald-500 border-emerald-500 text-white scale-110 shadow-lg shadow-emerald-200'
-                                            : 'bg-slate-50 border-slate-200 text-transparent'
+                                        ? 'bg-emerald-500 border-emerald-500 text-white scale-110 shadow-lg shadow-emerald-200'
+                                        : 'bg-slate-50 border-slate-200 text-transparent'
                                         }`}
                                 >
                                     <Check size={24} strokeWidth={3} />
