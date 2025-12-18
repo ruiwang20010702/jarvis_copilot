@@ -5,7 +5,7 @@ import { VideoWindow } from '../../shared/VideoWindow';
 import {
     BookOpen, X, CheckCircle2, Sparkles,
     Send, Mic, Highlighter, MousePointer2,
-    Navigation, Trophy, ChevronRight, BarChart3, HelpCircle, ChevronDown
+    Navigation, Trophy, ChevronRight, BarChart3, HelpCircle, ChevronDown, Zap
 } from 'lucide-react';
 import {
     COACHING_DEMO_QUESTION,
@@ -18,8 +18,10 @@ import {
     initAgent,
     agentInput,
     AgentAction,
-    AgentState
+    AgentState,
+    ChatContext
 } from '../../../services/apiService';
+import { StreamingChatPanel } from './StreamingChatPanel';
 
 export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
     const {
@@ -41,7 +43,9 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         highlights, // 实战阶段的做题痕迹
         addMessage,
         messages,
-        remoteStream
+        remoteStream,
+        currentCorrectionQuestionId,
+        setCurrentCorrectionQuestionId
     } = useGameStore();
 
     const [activeTab, setActiveTab] = useState<'article' | 'analysis'>('analysis');
@@ -53,6 +57,9 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     // Agent 会话状态
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [pendingTaskType, setPendingTaskType] = useState<string | null>(null);
+
+    // 流式模式开关（新的 LLM 驱动模式）
+    const [useStreamingMode, setUseStreamingMode] = useState(true);
 
     // 从 store 生成 quiz 分析数据
     const quizAnalysis = useMemo(() => {
@@ -97,19 +104,53 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     const [aiScript, setAiScript] = useState<string | null>(null);
     const [aiScriptLoading, setAiScriptLoading] = useState(false);
 
-    // 获取当前错题信息和序号
+    // 获取当前错题或蒙对题目信息和序号
     const { currentWrongQuestion, questionIndex } = useMemo(() => {
-        const wrongItem = quizAnalysis.find(q => q.status === 'wrong');
-        if (wrongItem) {
-            const quiz = articleData.quiz.find(q => q.id === wrongItem.questionId);
-            const index = articleData.quiz.findIndex(q => q.id === wrongItem.questionId) + 1;
+        // 1. 优先使用 store 中指定的当前纠错题目 ID
+        if (currentCorrectionQuestionId) {
+            const quiz = articleData.quiz.find(q => q.id === currentCorrectionQuestionId);
+            const coachingItem = quizAnalysis.find(q => q.questionId === currentCorrectionQuestionId);
+            const index = articleData.quiz.findIndex(q => q.id === currentCorrectionQuestionId) + 1;
+
+            if (quiz) {
+                return {
+                    currentWrongQuestion: { ...quiz, studentAnswer: coachingItem?.studentAnswer || '' },
+                    questionIndex: index
+                };
+            }
+        }
+
+        // 2. Fallback: 查找第一个需要讲解的题目
+        const coachingItem = quizAnalysis.find(q => q.status === 'wrong' || q.status === 'guessed');
+
+        if (coachingItem) {
+            const quiz = articleData.quiz.find(q => q.id === coachingItem.questionId);
+            const index = articleData.quiz.findIndex(q => q.id === coachingItem.questionId) + 1;
             return {
-                currentWrongQuestion: quiz ? { ...quiz, studentAnswer: wrongItem.studentAnswer } : null,
+                currentWrongQuestion: quiz ? { ...quiz, studentAnswer: coachingItem.studentAnswer } : null,
                 questionIndex: index
             };
         }
         return { currentWrongQuestion: null, questionIndex: 0 };
-    }, [quizAnalysis, articleData.quiz]);
+    }, [quizAnalysis, articleData.quiz, currentCorrectionQuestionId]);
+
+    // 初始化：如果没有选中题目，自动选中第一个错题
+    useEffect(() => {
+        if (!currentCorrectionQuestionId && quizAnalysis.length > 0) {
+            const firstWrong = quizAnalysis.find(q => q.status === 'wrong' || q.status === 'guessed');
+            if (firstWrong) {
+                setCurrentCorrectionQuestionId(firstWrong.questionId);
+            }
+        }
+    }, [currentCorrectionQuestionId, quizAnalysis, setCurrentCorrectionQuestionId]);
+
+    // 自动开始带练（当进入流式模式且未开始时）
+    useEffect(() => {
+        if (useStreamingMode && coachingPhase === 0) {
+            console.log('[CoachCoaching] Auto-starting coaching phase in Streaming Mode');
+            setCoachingPhase(1);
+        }
+    }, [useStreamingMode, coachingPhase, setCoachingPhase]);
 
     // 初始化 Agent 会话（当进入第 1 阶段时）
     useEffect(() => {
@@ -180,6 +221,11 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     // 监听任务完成，调用 Agent 分析学生反馈
     useEffect(() => {
         const processTaskCompletion = async () => {
+            // 如果处于流式模式，不走旧的 Agent 逻辑
+            if (useStreamingMode) {
+                return;
+            }
+
             if (!coachingTaskCompleted || !coachingTaskType || !agentSessionId) {
                 return;
             }
@@ -197,8 +243,12 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                     inputData = { transcript: lastStudentMsg?.text || '学生已完成语音任务' };
                 } else if (coachingTaskType === 'highlight') {
                     inputType = 'highlight';
-                    const lastHighlight = studentHighlights.slice(-1)[0];
-                    inputData = { text: lastHighlight?.text || '', paragraph_index: lastHighlight?.paragraphIndex || 0 };
+                    // 发送所有高亮内容，用逗号分隔
+                    const allHighlightTexts = studentHighlights.map(h => h.text).join('、');
+                    inputData = {
+                        text: allHighlightTexts || '',
+                        highlights: studentHighlights.map(h => ({ text: h.text, paragraph_index: h.paragraphIndex }))
+                    };
                 } else if (coachingTaskType === 'select') {
                     inputType = 'select_option';
                     // 这里需要从 store 获取学生的选择
@@ -278,6 +328,29 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         setJarvisAnalysis(null);
     };
 
+    // 处理切换到下一题
+    const handleNextQuestion = () => {
+        // 1. 找到所有需要讲解的题目
+        const wrongQuestions = quizAnalysis.filter(q => q.status === 'wrong' || q.status === 'guessed');
+
+        // 2. 找到当前题目的索引
+        const currentIndex = wrongQuestions.findIndex(q => q.questionId === currentCorrectionQuestionId);
+
+        // 3. 切换到下一题
+        if (currentIndex !== -1 && currentIndex < wrongQuestions.length - 1) {
+            const nextQuestionId = wrongQuestions[currentIndex + 1].questionId;
+            setCurrentCorrectionQuestionId(nextQuestionId);
+
+            // 重置会话状态，重新开始
+            setAgentSessionId(null);
+            setAiScript(null);
+            setCoachingPhase(1); // 重新开始 Phase 1
+        } else {
+            // 所有题目讲解完毕
+            alert('所有错题已讲解完毕！🎉');
+        }
+    };
+
     // 获取任务类型图标
     const getTaskIcon = (type: string) => {
         switch (type) {
@@ -293,6 +366,9 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     // 渲染文章段落（带高亮 - 包括实战阶段痕迹）
     const renderParagraphWithHighlights = (para: string, paraIndex: number) => {
         const isFocused = focusParagraphIndex === paraIndex;
+
+        // 检查当前段落是否是错题相关段落
+        const isRelatedToWrongQuestion = currentWrongQuestion?.relatedParagraphIndices?.includes(paraIndex);
 
         let content: React.ReactNode = para;
 
@@ -348,12 +424,25 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             <div
                 key={paraIndex}
                 onClick={() => setFocusParagraph(isFocused ? null : paraIndex)}
-                className={`mb-4 p-4 rounded-xl cursor-pointer transition-all duration-300 border ${isFocused
-                    ? 'bg-blue-50/50 border-[#00B4EE]/30 shadow-sm'
-                    : 'bg-transparent border-transparent hover:bg-slate-50'
+                className={`mb-4 p-4 rounded-xl cursor-pointer transition-all duration-300 border-2 ${isRelatedToWrongQuestion
+                    ? 'bg-amber-50/50 border-amber-300 shadow-sm ring-2 ring-amber-200/50'
+                    : isFocused
+                        ? 'bg-blue-50/50 border-[#00B4EE]/30 shadow-sm'
+                        : 'bg-transparent border-transparent hover:bg-slate-50'
                     }`}
             >
-                <p className={`text-base leading-relaxed font-serif transition-colors ${isFocused ? 'text-slate-800 font-medium' : 'text-slate-500'
+                {/* 错题相关段落标记 */}
+                {isRelatedToWrongQuestion && (
+                    <div className="text-xs font-bold text-amber-600 mb-2 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        错题相关段落
+                    </div>
+                )}
+                <p className={`text-base leading-relaxed font-serif transition-colors ${isRelatedToWrongQuestion
+                    ? 'text-slate-800'
+                    : isFocused
+                        ? 'text-slate-800 font-medium'
+                        : 'text-slate-500'
                     }`}>
                     {content}
                 </p>
@@ -442,16 +531,6 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 {articleData.title}
                             </h2>
                             {articleData.paragraphs.map((para, i) => renderParagraphWithHighlights(para, i))}
-
-                            {/* Demo题目对应的文章内容 */}
-                            <div className="mt-8 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
-                                <div className="text-xs font-bold text-amber-600 mb-2 uppercase tracking-wider">
-                                    错题相关段落 (Demo)
-                                </div>
-                                <p className="text-base leading-relaxed font-serif text-slate-700">
-                                    {COACHING_DEMO_QUESTION.article}
-                                </p>
-                            </div>
                         </div>
                     )}
 
@@ -493,7 +572,12 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                             {/* 题目头部 - 可点击展开 */}
                                             <div
                                                 className="p-4 cursor-pointer hover:bg-white/30 transition-colors"
-                                                onClick={() => setExpandedQuestion(isExpanded ? null : item.questionId)}
+                                                onClick={() => {
+                                                    setExpandedQuestion(isExpanded ? null : item.questionId);
+                                                    if (!isExpanded) {
+                                                        setCurrentCorrectionQuestionId(item.questionId);
+                                                    }
+                                                }}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
@@ -591,232 +675,293 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             </AnimatePresence>
 
             {/* 右侧 30% - 重新设计布局：上方可滚动，聊天窗固定 */}
+            {/* 右侧 30% */}
             <div className="flex-[3] flex flex-col h-full overflow-hidden">
+                {/* 模式切换按钮 */}
+                <div className="flex items-center justify-between mb-2 px-1">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        AI 助教
+                    </span>
+                    <button
+                        onClick={() => setUseStreamingMode(!useStreamingMode)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 transition-all ${useStreamingMode
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                    >
+                        <Zap size={12} />
+                        {useStreamingMode ? 'AI 智能模式' : '经典模式'}
+                    </button>
+                </div>
 
-                {/* 上方可滚动区域 */}
-                <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pb-2">
-                    {/* 视频窗口 - 支持跨阶段平滑动画 */}
-                    <VideoWindow
-                        layoutId="coach-video"
-                        className="relative w-full shrink-0 rounded-xl shadow-md"
-                        style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
-                        videoStream={remoteStream}
-                    />
-
-                    {/* Jarvis 助教 */}
-                    <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl overflow-hidden shadow-sm"
-                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
-                        <div className="px-4 py-3 border-b border-cyan-100 bg-white/50 flex items-center gap-2">
-                            <Sparkles size={16} className="text-[#00B4EE]" />
-                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                                Jarvis 助教
-                            </span>
-                            {coachingPhase > 0 && (
-                                <span className="ml-auto text-xs font-bold text-[#00B4EE]">
-                                    {coachingPhase}/6
-                                </span>
-                            )}
+                {useStreamingMode ? (
+                    <div className="flex-1 flex flex-col min-h-0 space-y-3">
+                        <VideoWindow
+                            layoutId="coach-video"
+                            className="relative w-full shrink-0 rounded-xl shadow-md"
+                            style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
+                            videoStream={remoteStream}
+                        />
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0 border border-cyan-100">
+                            <StreamingChatPanel
+                                context={{
+                                    student_name: 'Alex',
+                                    student_level: 'L0',
+                                    article_title: articleData.title,
+                                    article_content: articleData.paragraphs.join('\n\n'),
+                                    question_stem: currentWrongQuestion?.question || (quizAnalysis.length > 0 ? '' : COACHING_DEMO_QUESTION.question),
+                                    options: (currentWrongQuestion?.options || (quizAnalysis.length > 0 ? [] : COACHING_DEMO_QUESTION.options)).map((opt: any) => ({
+                                        id: typeof opt === 'string' ? opt.charAt(0) : opt.id,
+                                        text: typeof opt === 'string' ? opt : opt.text
+                                    })),
+                                    correct_answer: currentWrongQuestion?.correctOption || (quizAnalysis.length > 0 ? '' : COACHING_DEMO_QUESTION.correctAnswer),
+                                    student_answer: currentWrongQuestion?.studentAnswer || (quizAnalysis.length > 0 ? '' : COACHING_DEMO_QUESTION.studentAnswer),
+                                    question_type: '细节理解题',
+                                    wrong_count: quizAnalysis.filter(q => q.status === 'wrong').length,
+                                    all_correct: quizAnalysis.length > 0 && quizAnalysis.every(q => q.status === 'correct'),
+                                    question_index: questionIndex || 1
+                                }}
+                                onToolCall={(name, args) => {
+                                    console.log('[CoachCoaching] Tool called:', name, args);
+                                }}
+                            />
                         </div>
-                        <div className="p-4">
-                            {coachingPhase === 0 ? (
-                                <div className="text-sm text-slate-600">
-                                    <div className="font-bold text-slate-800 mb-2">准备开始精准带练</div>
-                                    <p className="text-slate-500 leading-relaxed">
-                                        Alex 有 1 道错题需要纠正。点击下方按钮开始6步苏格拉底式教学。
-                                    </p>
+                    </div>
+                ) : (
+                    <>
+                        {/* 上方可滚动区域 */}
+                        <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pb-2">
+                            {/* 视频窗口 - 支持跨阶段平滑动画 */}
+                            <VideoWindow
+                                layoutId="coach-video"
+                                className="relative w-full shrink-0 rounded-xl shadow-md"
+                                style={{ border: '1px solid rgba(0, 180, 238, 0.4)' }}
+                                videoStream={remoteStream}
+                            />
+
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                    Jarvis 助教
+                                </span>
+                                {coachingPhase > 0 && (
+                                    <span className="text-xs font-bold text-[#00B4EE]">
+                                        {coachingPhase}/6
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl overflow-hidden shadow-sm"
+                                style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                                <div className="px-4 py-3 border-b border-cyan-100 bg-white/50 flex items-center gap-2">
+                                    <Sparkles size={16} className="text-[#00B4EE]" />
+                                    <span className="text-xs font-bold text-slate-700">AI 指导</span>
                                 </div>
-                            ) : (
-                                <div className="text-sm space-y-3">
-                                    {/* 当前阶段指导 */}
-                                    {currentPhaseConfig && (
-                                        <div>
-                                            <div className="font-bold text-[#00B4EE] mb-2">
-                                                {currentPhaseConfig.jarvisTitle}
-                                            </div>
-                                            <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                                                {aiScriptLoading ? (
-                                                    <span className="text-slate-400">✨ Jarvis 正在思考...</span>
-                                                ) : (
-                                                    aiScript || currentPhaseConfig.jarvisScript
-                                                )}
+                                <div className="p-4">
+                                    {coachingPhase === 0 ? (
+                                        <div className="text-sm text-slate-600">
+                                            <div className="font-bold text-slate-800 mb-2">准备开始精准带练</div>
+                                            <p className="text-slate-500 leading-relaxed">
+                                                Alex 有 1 道错题需要纠正。点击下方按钮开始6步苏格拉底式教学。
                                             </p>
-                                            {currentPhaseConfig.jarvisAction && !jarvisAnalysis && (
-                                                <div className="text-xs text-slate-500 bg-white/50 rounded-lg p-2 mt-2">
-                                                    {currentPhaseConfig.jarvisAction}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm space-y-3">
+                                            {/* 当前阶段指导 */}
+                                            {currentPhaseConfig && (
+                                                <div>
+                                                    <div className="font-bold text-[#00B4EE] mb-2">
+                                                        {currentPhaseConfig.jarvisTitle}
+                                                    </div>
+                                                    <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+                                                        {aiScriptLoading ? (
+                                                            <span className="text-slate-400">✨ Jarvis 正在思考...</span>
+                                                        ) : (
+                                                            aiScript || currentPhaseConfig.jarvisScript
+                                                        )}
+                                                    </p>
+                                                    {currentPhaseConfig.jarvisAction && !jarvisAnalysis && (
+                                                        <div className="text-xs text-slate-500 bg-white/50 rounded-lg p-2 mt-2">
+                                                            {currentPhaseConfig.jarvisAction}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Jarvis 分析反馈 */}
+                                            {jarvisAnalysis && (
+                                                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                                    <div className="text-xs font-bold text-emerald-700 mb-1">📊 学生反馈分析</div>
+                                                    <p className="text-sm text-emerald-800 whitespace-pre-line">
+                                                        {jarvisAnalysis}
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
                                     )}
-
-                                    {/* Jarvis 分析反馈 */}
-                                    {jarvisAnalysis && (
-                                        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                                            <div className="text-xs font-bold text-emerald-700 mb-1">📊 学生反馈分析</div>
-                                            <p className="text-sm text-emerald-800 whitespace-pre-line">
-                                                {jarvisAnalysis}
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* 任务发布按钮 */}
-                    <div className="space-y-2">
-                        {coachingPhase === 0 ? (
-                            <button
-                                onClick={handleNextPhase}
-                                className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                                style={{ background: 'linear-gradient(135deg, #00B4EE 0%, #0088CC 100%)' }}
-                            >
-                                <ChevronRight size={20} />
-                                开始精准带练
-                            </button>
-                        ) : (
-                            <>
-                                {canPublishTask && (
-                                    <button
-                                        onClick={handlePublishTask}
-                                        className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                                        style={{ background: 'linear-gradient(135deg, #00B4EE 0%, #0088CC 100%)' }}
-                                    >
-                                        {currentPhaseConfig && getTaskIcon(currentPhaseConfig.taskType)}
-                                        发布任务: {currentPhaseConfig?.name}
-                                    </button>
-                                )}
-
-                                {coachingTaskType && (
-                                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 text-sm">
-                                                {getTaskIcon(coachingTaskType)}
-                                                <span className="font-medium text-slate-700">
-                                                    {currentPhaseConfig?.name}
-                                                </span>
-                                            </div>
-                                            <div className={`text-xs font-bold px-2 py-1 rounded-full ${coachingTaskCompleted
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : coachingTaskReceived
-                                                    ? 'bg-amber-100 text-amber-700'
-                                                    : 'bg-slate-100 text-slate-500'
-                                                }`}>
-                                                {coachingTaskCompleted
-                                                    ? '✓ 已完成'
-                                                    : coachingTaskReceived
-                                                        ? '进行中...'
-                                                        : '等待接收'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {coachingTaskCompleted && coachingPhase < 6 && (
-                                    <button
-                                        onClick={handleNextPhase}
-                                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 transition-all"
-                                    >
-                                        <ChevronRight size={18} />
-                                        进入下一阶段
-                                    </button>
-                                )}
-
-                                {coachingPhase === 6 && coachingTaskCompleted && (
-                                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
-                                        <Trophy size={24} className="text-emerald-600 mx-auto mb-2" />
-                                        <div className="font-bold text-emerald-700">6步教学完成！</div>
-                                        <div className="text-sm text-emerald-600">Alex 已掌握正确解题方法</div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        {/* 阶段进度指示器 */}
-                        {coachingPhase > 0 && (
-                            <div className="flex justify-center gap-1.5 pt-2">
-                                {[1, 2, 3, 4, 5, 6].map(i => (
-                                    <div
-                                        key={i}
-                                        className={`w-2 h-2 rounded-full transition-all ${i < coachingPhase
-                                            ? 'bg-emerald-500'
-                                            : i === coachingPhase
-                                                ? 'bg-[#00B4EE] scale-125'
-                                                : 'bg-slate-200'
-                                            }`}
-                                    />
-                                ))}
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* 聊天窗 - 固定高度 */}
-                <div className="h-64 shrink-0 mt-2">
-                    <div className="flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm h-full"
-                        style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                CHAT LOG
-                            </span>
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
                         </div>
-                        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-                            {messages.length === 0 && !studentHighlights.length ? (
-                                <div className="flex flex-col items-center justify-center h-full text-slate-300">
-                                    <p className="text-xs">等待学生互动...</p>
-                                </div>
+
+                        {/* 任务发布按钮 */}
+                        <div className="space-y-2">
+                            {coachingPhase === 0 ? (
+                                <button
+                                    onClick={handleNextPhase}
+                                    className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                                    style={{ background: 'linear-gradient(135deg, #00B4EE 0%, #0088CC 100%)' }}
+                                >
+                                    <ChevronRight size={20} />
+                                    开始精准带练
+                                </button>
                             ) : (
                                 <>
-                                    {/* 显示学生画线内容（学生是对方，显示在左侧） */}
-                                    {studentHighlights.map((h, idx) => (
-                                        <div key={`highlight-${idx}`} className="flex justify-start">
-                                            <div className="max-w-[85%] px-3 py-2 rounded-xl text-xs bg-amber-100 text-amber-800">
-                                                <div className="text-[10px] opacity-60 mb-0.5 font-semibold">Alex 画线</div>
-                                                "{h.text}"
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* 普通消息 */}
-                                    {messages.slice(-5).map((msg) => (
-                                        <div
-                                            key={msg.id}
-                                            className={`flex ${msg.role === 'coach' ? 'justify-end' : 'justify-start'}`}
+                                    {canPublishTask && (
+                                        <button
+                                            onClick={handlePublishTask}
+                                            className="w-full py-4 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                                            style={{ background: 'linear-gradient(135deg, #00B4EE 0%, #0088CC 100%)' }}
                                         >
-                                            <div
-                                                className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'coach'
-                                                    ? 'bg-[#00B4EE] text-white'
-                                                    : msg.role === 'jarvis'
-                                                        ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
-                                                        : 'bg-slate-100 text-slate-700'
-                                                    }`}
-                                            >
-                                                <div className="text-[10px] opacity-60 mb-0.5 font-semibold">
-                                                    {msg.role === 'jarvis' ? 'Jarvis' :
-                                                        msg.role === 'coach' ? 'You' : 'Alex'}
+                                            {currentPhaseConfig && getTaskIcon(currentPhaseConfig.taskType)}
+                                            发布任务: {currentPhaseConfig?.name}
+                                        </button>
+                                    )}
+
+                                    {coachingTaskType && (
+                                        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    {getTaskIcon(coachingTaskType)}
+                                                    <span className="font-medium text-slate-700">
+                                                        {currentPhaseConfig?.name}
+                                                    </span>
                                                 </div>
-                                                {msg.text}
+                                                <div className={`text-xs font-bold px-2 py-1 rounded-full ${coachingTaskCompleted
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : coachingTaskReceived
+                                                        ? 'bg-amber-100 text-amber-700'
+                                                        : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                    {coachingTaskCompleted
+                                                        ? '✓ 已完成'
+                                                        : coachingTaskReceived
+                                                            ? '进行中...'
+                                                            : '等待接收'}
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {coachingTaskCompleted && coachingPhase < 6 && (
+                                        <button
+                                            onClick={handleNextPhase}
+                                            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 transition-all"
+                                        >
+                                            <ChevronRight size={18} />
+                                            进入下一阶段
+                                        </button>
+                                    )}
+
+                                    {coachingPhase === 6 && coachingTaskCompleted && (
+                                        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                                            <Trophy size={24} className="text-emerald-600 mx-auto mb-2" />
+                                            <div className="font-bold text-emerald-700">6步教学完成！</div>
+                                            <div className="text-sm text-emerald-600">Alex 已掌握正确解题方法</div>
+                                        </div>
+                                    )}
                                 </>
                             )}
+
+                            {/* 阶段进度指示器 */}
+                            {coachingPhase > 0 && (
+                                <div className="flex justify-center gap-1.5 pt-2">
+                                    {[1, 2, 3, 4, 5, 6].map(i => (
+                                        <div
+                                            key={i}
+                                            className={`w-2 h-2 rounded-full transition-all ${i < coachingPhase
+                                                ? 'bg-emerald-500'
+                                                : i === coachingPhase
+                                                    ? 'bg-[#00B4EE] scale-125'
+                                                    : 'bg-slate-200'
+                                                }`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <div className="border-t border-slate-200 p-2 bg-white">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="给学生留言..."
-                                    className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-[#00B4EE] transition-colors"
-                                />
-                                <button className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
-                                    <Send size={14} />
-                                </button>
+                    </>
+                )}
+
+
+
+                {/* 聊天窗 - 固定高度（仅在经典模式下显示） */}
+                {!useStreamingMode && (
+                    <div className="h-64 shrink-0 mt-2">
+                        <div className="flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm h-full"
+                            style={{ border: '1px solid rgba(0, 180, 238, 0.25)' }}>
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    CHAT LOG
+                                </span>
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+                                {messages.length === 0 && !studentHighlights.length ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                                        <p className="text-xs">等待学生互动...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* 显示学生画线内容（学生是对方，显示在左侧） */}
+                                        {studentHighlights.map((h, idx) => (
+                                            <div key={`highlight-${idx}`} className="flex justify-start">
+                                                <div className="max-w-[85%] px-3 py-2 rounded-xl text-xs bg-amber-100 text-amber-800">
+                                                    <div className="text-[10px] opacity-60 mb-0.5 font-semibold">Alex 画线</div>
+                                                    "{h.text}"
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* 普通消息 */}
+                                        {messages.slice(-5).map((msg) => (
+                                            <div
+                                                key={msg.id}
+                                                className={`flex ${msg.role === 'coach' ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div
+                                                    className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'coach'
+                                                        ? 'bg-[#00B4EE] text-white'
+                                                        : msg.role === 'jarvis'
+                                                            ? 'bg-cyan-50 text-cyan-800 border border-cyan-100'
+                                                            : 'bg-slate-100 text-slate-700'
+                                                        }`}
+                                                >
+                                                    <div className="text-[10px] opacity-60 mb-0.5 font-semibold">
+                                                        {msg.role === 'jarvis' ? 'Jarvis' :
+                                                            msg.role === 'coach' ? 'You' : 'Alex'}
+                                                    </div>
+                                                    {msg.text}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+                            <div className="border-t border-slate-200 p-2 bg-white">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="给学生留言..."
+                                        className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-[#00B4EE] transition-colors"
+                                    />
+                                    <button className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                                        <Send size={14} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </main>
+                )}
+            </div >
+        </main >
     );
 };

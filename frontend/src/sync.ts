@@ -43,6 +43,7 @@ const SYNC_KEYS = [
     // Coaching Phase 3 State
     'coachingPhase',
     'coachingTaskType',
+    'coachingTaskTarget',
     'coachingTaskReceived',
     'coachingTaskCompleted',
     'teacherHighlights',
@@ -63,6 +64,8 @@ const SYNC_KEYS = [
     'isSyllableMode',
     'isPlayingAudio',
     'vocabSpeakEnabled',
+    'vocabRecordingScore',
+    'studentRecordingState',
     // Surgery Phase 5 State
     'surgeryMode',
     'surgeryChunks',
@@ -187,6 +190,10 @@ function handleMessage(message: { type: string; payload?: SyncPayload; clientId?
             if (message.senderId === clientId) return; // 忽略自己的消息
 
             console.log(`[Sync] 📥 收到状态更新:`, message.payload ? Object.keys(message.payload) : []);
+            // 详细日志：调试跨设备同步
+            if (message.payload && 'vocabSpeakEnabled' in message.payload) {
+                console.log(`[Sync] 🎤 vocabSpeakEnabled 更新为: ${message.payload.vocabSpeakEnabled}`);
+            }
             if (message.payload) {
                 isReceiving = true;
                 useGameStore.setState(message.payload as Parameters<typeof useGameStore.setState>[0]);

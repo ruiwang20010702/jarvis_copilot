@@ -134,9 +134,9 @@ const Classroom: React.FC = () => {
     // 加载文章版本数据
     // TODO: articleId 和 level 应该从路由或配置中获取
     useEffect(() => {
-        // 加载文章 ID 2 的 L0 版本（数据库中有此数据）
-        const articleId = 2;
-        const level = 'L0';
+        // 加载文章 ID 4 的 L1 版本（version_id=10）
+        const articleId = 4;
+        const level = 'L1';
 
         console.log('[Classroom] Loading version data for article:', articleId, level);
         loadVersion(articleId, level);

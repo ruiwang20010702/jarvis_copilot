@@ -47,6 +47,7 @@ export interface ApiQuestion {
     analysis: string;
     error_tags: string[] | null;
     trap_type: string | null;
+    related_paragraph_indices: number[] | null; // 相关段落索引，用于 Coaching 阶段定位原文
 }
 
 export interface ApiSentenceSurgery {
@@ -117,10 +118,10 @@ export async function fetchArticles(skip = 0, limit = 10) {
  * @param word 要查询的单词
  * @param contextSentence 学生划词时的原句（用于语境翻译）
  */
-export async function lookupWord(word: string, contextSentence?: string): Promise<VocabLookupResult> {
+export async function lookupWord(word: string, contextSentence?: string, versionId?: number): Promise<VocabLookupResult> {
     return apiFetch<VocabLookupResult>('/api/vocab/lookup', {
         method: 'POST',
-        body: JSON.stringify({ word, context_sentence: contextSentence }),
+        body: JSON.stringify({ word, context_sentence: contextSentence, version_id: versionId }),
     });
 }
 
@@ -396,4 +397,240 @@ export async function assessPronunciation(audioBlob: Blob, text: string): Promis
     }
 
     return response.json();
+}
+
+// ============ Streaming Chat API (流式对话) ============
+
+/**
+ * 聊天消息
+ */
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+/**
+ * 聊天上下文
+ */
+export interface ChatContext {
+    student_name?: string;
+    student_level?: string;
+    article_title?: string;
+    article_content?: string;
+    question_stem?: string;
+    options?: Array<{ id: string; text: string }>;
+    correct_answer?: string;
+    student_answer?: string;
+    question_type?: string;
+    wrong_count?: number;
+    question_index?: number;
+}
+
+/**
+ * 流式事件类型
+ */
+export interface ChatStreamEvent {
+    type: 'text' | 'tool_call' | 'error' | 'done' | 'thinking_start' | 'thinking_end';
+    content: string | object;
+    tool_calls?: Array<{
+        name: string;
+        arguments: Record<string, any>;
+    }>;
+}
+
+/**
+ * 初始化聊天会话
+ */
+export async function initChatSession(context: ChatContext): Promise<{
+    session_id: string;
+    greeting: string;
+    suggested_task: {
+        type: string;
+        instruction: string;
+    };
+}> {
+    return apiFetch('/api/ai/chat/init', {
+        method: 'POST',
+        body: JSON.stringify({
+            session_id: '',
+            messages: [],
+            context,
+        }),
+    });
+}
+
+/**
+ * 流式聊天 - 返回 AsyncGenerator
+ * 
+ * 使用示例:
+ * ```
+ * for await (const event of chatStream(sessionId, messages, context)) {
+ *     if (event.type === 'text') {
+ *         console.log('收到文本:', event.content);
+ *     } else if (event.type === 'tool_call') {
+ *         console.log('工具调用:', event.content);
+ *     }
+ * }
+ * ```
+ */
+export async function* chatStream(
+    sessionId: string,
+    messages: ChatMessage[],
+    context?: ChatContext
+): AsyncGenerator<ChatStreamEvent, void, unknown> {
+    const response = await fetch(`${API_BASE_URL}/api/ai/chat/stream`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: sessionId,
+            messages,
+            context,
+        }),
+    });
+
+    if (!response.ok) {
+        yield {
+            type: 'error',
+            content: `API Error: ${response.status} ${response.statusText}`,
+        };
+        return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+        yield { type: 'error', content: 'No response body' };
+        return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // 解析 SSE 事件
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // 保留未完成的行
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim();
+                    if (data) {
+                        try {
+                            const event = JSON.parse(data) as ChatStreamEvent;
+                            yield event;
+                        } catch (e) {
+                            console.warn('[chatStream] Failed to parse event:', data);
+                        }
+                    }
+                }
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
+
+/**
+ * 获取聊天历史
+ */
+export async function getChatHistory(sessionId: string): Promise<{
+    session_id: string;
+    messages: ChatMessage[];
+    context: ChatContext;
+}> {
+    return apiFetch(`/api/ai/chat/history/${sessionId}`);
+}
+
+/**
+ * 删除聊天会话
+ */
+export async function deleteChatSession(sessionId: string): Promise<{ success: boolean }> {
+    return apiFetch(`/api/ai/chat/${sessionId}`, {
+        method: 'DELETE',
+    });
+}
+
+/**
+ * 流式初始化聊天 - 返回 AsyncGenerator
+ * 逐字输出问候语
+ */
+export interface InitStreamEvent {
+    type: 'session' | 'text' | 'tool_call' | 'done' | 'error';
+    session_id?: string;
+    content?: string;
+    greeting?: string;
+    suggested_task?: {
+        type: string;
+        instruction: string;
+        target?: string;
+    };
+    tool_calls?: unknown[];
+}
+
+export async function* initChatStream(
+    context: ChatContext
+): AsyncGenerator<InitStreamEvent, void, unknown> {
+    const response = await fetch(`${API_BASE_URL}/api/ai/chat/init-stream`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: '',
+            messages: [],
+            context,
+        }),
+    });
+
+    if (!response.ok) {
+        yield {
+            type: 'error',
+            content: `API Error: ${response.status} ${response.statusText}`,
+        };
+        return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+        yield { type: 'error', content: 'No response body' };
+        return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim();
+                    if (data) {
+                        try {
+                            const event = JSON.parse(data) as InitStreamEvent;
+                            yield event;
+                        } catch (e) {
+                            console.warn('[initChatStream] Failed to parse event:', data);
+                        }
+                    }
+                }
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
 }

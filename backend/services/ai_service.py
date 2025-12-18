@@ -9,7 +9,7 @@ load_dotenv()
 
 class AIService:
     def __init__(self):
-        self.default_model = os.getenv("DEFAULT_AI_MODEL", "zhipu")
+        self.default_model = os.getenv("DEFAULT_AI_MODEL", "gemini")
         self.zhipu_api_key = os.getenv("ZHIPU_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         
@@ -31,6 +31,8 @@ class AIService:
             return self._generate_zhipu(prompt, system_prompt)
         elif target_model == "gemini":
             return self._generate_gemini(prompt, system_prompt)
+        elif target_model == "doubao":
+            return await self._generate_doubao(prompt, system_prompt)
         else:
             raise ValueError(f"Unsupported AI model: {target_model}")
 
@@ -95,5 +97,360 @@ class AIService:
                     raise ValueError(f"Gemini generation failed: {e2}")
             raise ValueError(f"Gemini generation failed: {e}")
 
+    async def _generate_doubao(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """使用豆包生成文本（同步调用，非流式）"""
+        import httpx
+        import json
+        
+        api_key = os.getenv("ARK_API_KEY")
+        model = os.getenv("ARK_MODEL", "doubao-seed-1-8-251215")
+        base_url = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+        
+        if not api_key:
+            raise ValueError("ARK_API_KEY not configured")
+        
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        request_body = {
+            "model": model,
+            "messages": messages,
+            "stream": False
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{base_url}/chat/completions",
+                json=request_body,
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                raise ValueError(f"Doubao API error: {response.status_code} - {response.text}")
+            
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
 # Singleton instance
 ai_service = AIService()
+
+
+def generate_stream_with_tools(
+    messages: list,
+    tools: list = None,
+    system_prompt: str = None
+):
+    """
+    流式生成对话响应，支持 Function Calling（同步版本）
+    
+    注意：这是一个同步 generator，因为 Gemini 的流式 API 返回的是同步迭代器
+    
+    Args:
+        messages: 对话历史 [{"role": "user/assistant", "content": "..."}]
+        tools: 可用工具列表
+        system_prompt: 系统提示词
+    
+    Yields:
+        dict: {"type": "text/tool_call/done", "content": ...}
+    """
+    if not ai_service.gemini_client:
+        yield {"type": "error", "content": "Gemini API key not configured"}
+        return
+    
+    # 构建消息内容
+    contents = []
+    for msg in messages:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+    
+    # 添加系统提示词
+    if system_prompt:
+        contents.insert(0, {"role": "user", "parts": [{"text": f"[System Instruction]\n{system_prompt}"}]})
+        contents.insert(1, {"role": "model", "parts": [{"text": "understood, I will follow these instructions."}]})
+    
+    try:
+        # 使用 Gemini 3 Pro + thinking level low 进行流式生成
+        from google.genai import types
+        
+        # 转换工具定义为 Gemini 格式
+        gemini_tools = None
+        if tools:
+            function_declarations = []
+            for tool in tools:
+                function_declarations.append(
+                    types.FunctionDeclaration(
+                        name=tool["name"],
+                        description=tool["description"],
+                        parameters=tool["parameters"]
+                    )
+                )
+            gemini_tools = [types.Tool(function_declarations=function_declarations)]
+
+        # 使用 Gemini 3 Pro + thinking level low
+        config = types.GenerateContentConfig(
+            temperature=0.7,
+            max_output_tokens=2048,
+            tools=gemini_tools,
+            thinking_config=types.ThinkingConfig(thinking_level="low")
+        )
+        
+        print("[AIService] 🧠 Using Gemini 3 Pro with thinking_level=low")
+        
+        # 先发送"思考开始"事件
+        yield {"type": "thinking_start", "content": ""}
+        
+        # 调用流式 API
+        response_stream = ai_service.gemini_client.models.generate_content_stream(
+            model="gemini-3-pro-preview",
+            contents=contents,
+            config=config
+        )
+        
+        full_text = ""
+        thinking_ended = False
+        
+        for chunk in response_stream:
+            # 检查是否是思考内容（Gemini 的 thinking 部分）
+            if hasattr(chunk, 'candidates') and chunk.candidates:
+                for candidate in chunk.candidates:
+                    if hasattr(candidate, 'content') and candidate.content:
+                        for part in candidate.content.parts:
+                            # 检查是否是思考部分
+                            if hasattr(part, 'thought') and part.thought:
+                                # 这是思考内容，不输出给用户
+                                continue
+                            
+                            # 检查是否有工具调用
+                            if hasattr(part, 'function_call') and part.function_call:
+                                fc = part.function_call
+                                print(f"[AIService] 🔧 Tool call detected: {fc.name}")
+                                print(f"[AIService] 🔧 Arguments: {dict(fc.args) if hasattr(fc, 'args') else {}}")
+                                yield {
+                                    "type": "tool_call",
+                                    "content": {
+                                        "name": fc.name,
+                                        "arguments": dict(fc.args) if hasattr(fc, 'args') else {}
+                                    }
+                                }
+            
+            # 处理文本内容
+            if hasattr(chunk, 'text') and chunk.text:
+                # 第一次收到文本时，发送"思考结束"事件
+                if not thinking_ended:
+                    yield {"type": "thinking_end", "content": ""}
+                    thinking_ended = True
+                
+                full_text += chunk.text
+                yield {"type": "text", "content": chunk.text}
+        
+        # 如果从未收到文本，也要结束思考状态
+        if not thinking_ended:
+            yield {"type": "thinking_end", "content": ""}
+        
+        print(f"[AIService] Stream complete. Full text length: {len(full_text)}")
+        yield {"type": "done", "content": full_text}
+        
+    except Exception as e:
+        print(f"[AIService] Stream generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        yield {"type": "error", "content": str(e)}
+
+
+def convert_tools_to_openai_format(tools: list) -> list:
+    """将我们的工具定义转换为 OpenAI 兼容格式"""
+    if not tools:
+        return []
+    
+    openai_tools = []
+    for tool in tools:
+        openai_tools.append({
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": tool.get("parameters", {"type": "object", "properties": {}})
+            }
+        })
+    return openai_tools
+
+
+def generate_stream_with_tools_doubao(
+    messages: list,
+    tools: list = None,
+    system_prompt: str = None
+):
+    """
+    使用豆包模型流式生成对话响应，支持 Function Calling
+    
+    使用 OpenAI 兼容 API 格式
+    """
+    import httpx
+    import json
+    
+    api_key = os.getenv("ARK_API_KEY")
+    model = os.getenv("ARK_MODEL", "doubao-seed-1-8-251215")
+    base_url = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+    
+    if not api_key:
+        yield {"type": "error", "content": "ARK_API_KEY not configured"}
+        return
+    
+    print(f"[AIService] 🔥 Using Doubao model: {model}")
+    
+    # 构建消息
+    openai_messages = []
+    if system_prompt:
+        openai_messages.append({"role": "system", "content": system_prompt})
+    
+    for msg in messages:
+        role = msg.get("role", "user")
+        if role == "model":
+            role = "assistant"
+        openai_messages.append({"role": role, "content": msg.get("content", "")})
+    
+    # 构建请求体
+    request_body = {
+        "model": model,
+        "messages": openai_messages,
+        "stream": True
+    }
+    
+    # 添加工具
+    if tools:
+        request_body["tools"] = convert_tools_to_openai_format(tools)
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    full_text = ""
+    tool_calls_buffer = {}  # 用于收集流式 tool call 片段
+    
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            with client.stream(
+                "POST",
+                f"{base_url}/chat/completions",
+                json=request_body,
+                headers=headers
+            ) as response:
+                if response.status_code != 200:
+                    error_text = response.read().decode()
+                    print(f"[Doubao] API error: {response.status_code} - {error_text}")
+                    yield {"type": "error", "content": f"Doubao API error: {response.status_code}"}
+                    return
+                
+                for line in response.iter_lines():
+                    if not line or line == "data: [DONE]":
+                        continue
+                    
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        try:
+                            data = json.loads(data_str)
+                            choices = data.get("choices", [])
+                            
+                            for choice in choices:
+                                delta = choice.get("delta", {})
+                                
+                                # 处理文本内容
+                                content = delta.get("content")
+                                if content:
+                                    full_text += content
+                                    yield {"type": "text", "content": content}
+                                
+                                # 处理工具调用
+                                tool_calls = delta.get("tool_calls", [])
+                                for tc in tool_calls:
+                                    idx = tc.get("index", 0)
+                                    if idx not in tool_calls_buffer:
+                                        tool_calls_buffer[idx] = {
+                                            "name": "",
+                                            "arguments": ""
+                                        }
+                                    
+                                    if tc.get("function", {}).get("name"):
+                                        tool_calls_buffer[idx]["name"] = tc["function"]["name"]
+                                    
+                                    if tc.get("function", {}).get("arguments"):
+                                        tool_calls_buffer[idx]["arguments"] += tc["function"]["arguments"]
+                                
+                                # 检查是否完成
+                                finish_reason = choice.get("finish_reason")
+                                if finish_reason == "tool_calls":
+                                    # 输出收集到的工具调用
+                                    for idx, tc_data in tool_calls_buffer.items():
+                                        try:
+                                            args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                                        except json.JSONDecodeError:
+                                            args = {}
+                                        
+                                        print(f"[Doubao] 🔧 Tool call: {tc_data['name']}")
+                                        print(f"[Doubao] 🔧 Arguments: {args}")
+                                        yield {
+                                            "type": "tool_call",
+                                            "content": {
+                                                "name": tc_data["name"],
+                                                "arguments": args
+                                            }
+                                        }
+                                
+                        except json.JSONDecodeError:
+                            continue
+        
+        # 兜底：如果流结束了但 buffer 里还有工具调用没输出（可能 finish_reason 不是 tool_calls）
+        if tool_calls_buffer:
+            for idx, tc_data in tool_calls_buffer.items():
+                # 检查这个工具调用是否已经输出过（这里简单处理，如果 name 存在且 args 可解析就输出）
+                if tc_data["name"]:
+                    try:
+                        args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    
+                    print(f"[Doubao] 🔧 Final check tool call: {tc_data['name']}")
+                    yield {
+                        "type": "tool_call",
+                        "content": {
+                            "name": tc_data["name"],
+                            "arguments": args
+                        }
+                    }
+            # 清空 buffer 避免重复
+            tool_calls_buffer.clear()
+
+        print(f"[Doubao] Stream complete. Full text length: {len(full_text)}")
+        yield {"type": "done", "content": full_text}
+        
+    except Exception as e:
+        print(f"[Doubao] Stream generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        yield {"type": "error", "content": str(e)}
+
+
+def get_coaching_ai_generator(messages: list, tools: list, system_prompt: str):
+    """
+    根据配置获取对应的 AI 生成器
+    
+    COACHING_AI_PROVIDER 环境变量:
+    - gemini (默认): 使用 Gemini 3 Pro
+    - doubao: 使用豆包
+    """
+    provider = os.getenv("COACHING_AI_PROVIDER", "gemini").lower()
+    
+    if provider == "doubao":
+        print("[AIService] 🔥 Using Doubao for coaching")
+        return generate_stream_with_tools_doubao(messages, tools, system_prompt)
+    else:
+        print("[AIService] 💎 Using Gemini for coaching")
+        return generate_stream_with_tools(messages, tools, system_prompt)

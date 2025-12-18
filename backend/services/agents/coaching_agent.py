@@ -305,8 +305,7 @@ class CoachingAgent(BaseAgent):
 
         try:
             response = await ai_service.generate_text(
-                prompt=decision_prompt,
-                model="gemini"
+                prompt=decision_prompt
             )
             
             # 解析 JSON 响应
@@ -406,7 +405,7 @@ class CoachingAgent(BaseAgent):
 """
         
         try:
-            script = await ai_service.generate_text(prompt=prompt, model="gemini")
+            script = await ai_service.generate_text(prompt=prompt)
             return script.strip().strip('"')
         except Exception as e:
             print(f"[CoachingAgent] Script generation failed: {e}")

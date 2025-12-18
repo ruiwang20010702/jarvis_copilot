@@ -50,14 +50,17 @@ class VocabService:
             "ai_memory_hint": None,
         }
         
-        # 1. 获取音标 (Free Dictionary API)
-        result["phonetic"] = await self._get_phonetic(word)
+        # 1. 尝试从 Free Dictionary API 获取音标
+        api_phonetic = await self._get_phonetic(word)
         
-        # 2. LLM 生成：语境翻译 + 音节 + AI助记
+        # 2. LLM 生成：语境翻译 + 音节 + AI助记 + 备选音标
         llm_result = await self._generate_with_llm(word, context_sentence)
         result["definition"] = llm_result.get("definition", f"{word} 的释义")
         result["syllables"] = llm_result.get("syllables", [word])
         result["ai_memory_hint"] = llm_result.get("mnemonic", "")
+        
+        # 音标优先使用 API，没有则用 LLM 生成的
+        result["phonetic"] = api_phonetic or llm_result.get("phonetic", "")
         
         # 3. 生成 TTS 音频
         result["audio_url"] = await self._generate_tts(word)
@@ -99,6 +102,7 @@ class VocabService:
 
 请返回以下 JSON 格式（只返回 JSON，不要其他内容）:
 {{
+    "phonetic": "国际音标，如 /əbˈsest/",
     "definition": "中文释义（如果有原句，请根据原句语境翻译，格式如：'adj. 着迷的 (此句中指沉迷于...)'）",
     "syllables": ["音节1", "音节2", ...],  // 按发音拆分，如 obsessed -> ["ob", "sessed"]
     "mnemonic": "💡 趣味记忆法，如拆分联想、谐音等，要有趣好记（50字以内）"
@@ -106,7 +110,7 @@ class VocabService:
 """
         
         try:
-            response = await ai_service.generate_text(prompt=prompt, model="gemini")
+            response = await ai_service.generate_text(prompt=prompt)
             
             # 解析 JSON
             response = response.strip()

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from routers import users, articles, sessions, websocket, vocab, ai
+from routers import users, articles, sessions, websocket, vocab, ai, chat_stream
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +33,7 @@ app.include_router(sessions.router)
 app.include_router(websocket.router)
 app.include_router(vocab.router)
 app.include_router(ai.router)
+app.include_router(chat_stream.router)
 
 # Static Files - 为 TTS 音频文件提供服务
 static_dir = Path(__file__).parent / "static"

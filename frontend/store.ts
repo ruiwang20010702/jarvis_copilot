@@ -26,6 +26,7 @@ export interface QuizQuestion {
   question: string;
   options: QuizOption[];
   correctOption: string;
+  relatedParagraphIndices?: number[];  // 相关段落索引，用于 Coaching 阶段高亮
 }
 
 export interface Highlight {
@@ -74,11 +75,12 @@ interface GameStore {
 
   // Battle State
   lookupLimit: number;
-  lookups: { word: string; context: string }[];
+  lookups: { word: string; context: string; versionId?: number }[];
   highlights: Highlight[];
   quizAnswers: QuizAnswer[];
   scrollProgress: number; // 0-100
   articleData: {
+    versionId?: number;
     title: string;
     paragraphs: string[];
     quiz: QuizQuestion[];
@@ -95,6 +97,7 @@ interface GameStore {
   // 6步教学阶段状态
   coachingPhase: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0=未开始, 1-6=6个阶段
   coachingTaskType: 'highlight' | 'voice' | 'select' | 'gps' | 'review' | null; // 当前任务类型
+  coachingTaskTarget: 'article' | 'question' | null; // 任务目标区域（主要用于划词）
   coachingTaskReceived: boolean; // 学生是否已接收任务
   coachingTaskCompleted: boolean; // 学生是否已完成任务
   teacherHighlights: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }[]; // 教师红色画线
@@ -116,6 +119,8 @@ interface GameStore {
   isSyllableMode: boolean;
   isPlayingAudio: 'none' | 'student' | 'standard';
   vocabSpeakEnabled: boolean; // 老师是否已启动跟读阶段
+  vocabRecordingScore: number | null; // 学生的发音评分
+  studentRecordingState: 'idle' | 'recording' | 'assessing' | 'finished'; // 学生录音状态
 
   // Surgery State (Phase 5)
   surgeryMode: SurgeryMode;
@@ -146,7 +151,7 @@ interface GameStore {
   setQuickReplies: (replies: string[]) => void;
 
   // Battle Actions
-  addLookup: (word: string, context?: string) => void;
+  addLookup: (word: string, context?: string, versionId?: number) => void;
   addHighlight: (text: string) => void;
   removeHighlight: (id: string) => void;
   setQuizAnswer: (qId: number, oId: string, isUnsure: boolean) => void;
@@ -169,7 +174,7 @@ interface GameStore {
   // 6步教学 Actions
   advanceCoachingPhase: () => void; // 教师推进到下一阶段
   setCoachingPhase: (phase: 0 | 1 | 2 | 3 | 4 | 5 | 6) => void;
-  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review') => void; // 教师发布任务
+  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review', target?: 'article' | 'question') => void; // 教师发布任务
   receiveCoachingTask: () => void; // 学生接收任务
   completeCoachingTask: () => void; // 学生完成任务
   addTeacherHighlight: (highlight: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }) => void;
@@ -217,6 +222,8 @@ interface GameStore {
   // Video State
   remoteStream: MediaStream | null;
   setRemoteStream: (stream: MediaStream | null) => void;
+  isMuted: boolean;
+  setIsMuted: (muted: boolean) => void;
 
   reset: () => void;
 }
@@ -368,6 +375,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // 6步教学默认值
   coachingPhase: 0,
   coachingTaskType: null,
+  coachingTaskTarget: null,
   coachingTaskReceived: false,
   coachingTaskCompleted: false,
   teacherHighlights: [],
@@ -389,6 +397,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isSyllableMode: false,
   isPlayingAudio: 'none',
   vocabSpeakEnabled: false,
+  vocabRecordingScore: null,
+  studentRecordingState: 'idle',
 
   // Surgery Defaults
   surgeryMode: 'observation',
@@ -426,11 +436,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   })),
   setQuickReplies: (replies) => set({ quickReplies: replies }),
 
-  addLookup: (word: string, context?: string) => set((state) => {
+  addLookup: (word: string, context?: string, versionId?: number) => set((state) => {
     if (state.currentStage !== 'coaching' && (state.lookups.length >= state.lookupLimit || state.lookups.some(l => l.word === word))) {
       return state;
     }
-    return { lookups: [...state.lookups, { word, context: context || '' }] };
+    return { lookups: [...state.lookups, { word, context: context || '', versionId }] };
   }),
   addHighlight: (text) => set((state) => ({
     highlights: [...state.highlights, { id: Math.random().toString(36).substring(7), text, color: 'yellow' }]
@@ -487,7 +497,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     for (const lookup of lookups) {
       try {
-        const result = await lookupWord(lookup.word, lookup.context);
+        const result = await lookupWord(lookup.word, lookup.context, lookup.versionId);
         vocabItems.push(transformLookupResult(result));
         vocabStatus[lookup.word] = 'unseen';
       } catch (error) {
@@ -532,19 +542,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   advanceCoachingPhase: () => set((state) => ({
     coachingPhase: Math.min(state.coachingPhase + 1, 6) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
     coachingTaskType: null,
+    coachingTaskTarget: null,
     coachingTaskReceived: false,
     coachingTaskCompleted: false
   })),
   setCoachingPhase: (phase) => set({
     coachingPhase: phase,
     coachingTaskType: null,
+    coachingTaskTarget: null,
     coachingTaskReceived: false,
     coachingTaskCompleted: false
   }),
-  publishCoachingTask: (type) => set({
+  publishCoachingTask: (type, target) => set({
     coachingTaskType: type,
+    coachingTaskTarget: target || null,
     coachingTaskReceived: false,
-    coachingTaskCompleted: false
+    coachingTaskCompleted: false,
+    studentHighlights: [] // 重置学生之前的划词
   }),
   receiveCoachingTask: () => set({ coachingTaskReceived: true }),
   completeCoachingTask: () => set({ coachingTaskCompleted: true }),
@@ -560,6 +574,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   resetCoachingState: () => set({
     coachingPhase: 0,
     coachingTaskType: null,
+    coachingTaskTarget: null,
     coachingTaskReceived: false,
     coachingTaskCompleted: false,
     teacherHighlights: [],
@@ -899,4 +914,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     console.log('[Store] setRemoteStream called:', stream ? 'MediaStream with ' + stream.getTracks().length + ' tracks' : 'null');
     set({ remoteStream: stream });
   },
+  isMuted: false,
+  setIsMuted: (muted) => set({ isMuted: muted }),
 }));

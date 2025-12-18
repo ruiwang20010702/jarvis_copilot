@@ -78,7 +78,10 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         isSyllableMode,
         toggleVocabCheck,
         submitExitPass,
-        remoteStream
+        remoteStream,
+        vocabSpeakEnabled,
+        vocabRecordingScore,
+        studentRecordingState
     } = useGameStore();
 
     const currentCard = vocabList[currentVocabIndex];
@@ -91,9 +94,6 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
 
     // 教学步骤状态 (0=播放, 1=音节, 2=翻转, 3=跟读, 4=下一个)
     const [teachingStep, setTeachingStep] = useState(0);
-    // 跟读Demo状态
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingScore, setRecordingScore] = useState<number | null>(null);
 
     // 当前剧本
     const currentScript = VOCAB_TEACHING_SCRIPT[teachingStep];
@@ -102,13 +102,12 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
     useEffect(() => {
         setCardKey(prev => prev + 1);
         setTeachingStep(0);
-        setIsRecording(false);
-        setRecordingScore(null);
-        // 同时重置卡片的翻转和音节状态，以及跟读权限
+        // 同时重置卡片的翻转和音节状态，以及跟读权限和评分
         useGameStore.setState({
             vocabCardFlipped: false,
             isSyllableMode: false,
-            vocabSpeakEnabled: false
+            vocabSpeakEnabled: false,
+            vocabRecordingScore: null
         });
     }, [currentVocabIndex, currentRemedialWord]);
 
@@ -117,8 +116,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         if (prevIndex >= 0) {
             // 先重置本地状态
             setTeachingStep(0);
-            setIsRecording(false);
-            setRecordingScore(null);
+
+
             // 再更新全局状态（这会触发 useEffect）
             useGameStore.setState({
                 currentVocabIndex: prevIndex,
@@ -132,8 +131,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
     const handleNextVocabCard = () => {
         // 先重置本地状态
         setTeachingStep(0);
-        setIsRecording(false);
-        setRecordingScore(null);
+
+
         // 再调用全局的 nextVocabCard（这会触发 useEffect）
         nextVocabCard();
     };
@@ -162,24 +161,13 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         }
     };
 
-    // 处理跟读Demo
+    // 处理跟读按钮 - 只启用学生端录音权限
     const handleSpeakClick = () => {
-        // 启用学生端的麦克风
+        // 启用学生端的麦克风录音权限
         useGameStore.setState({ vocabSpeakEnabled: true });
-
-        if (!isRecording && recordingScore === null) {
-            // 开始录音
-            setIsRecording(true);
-            // 模拟录音3秒后完成
-            setTimeout(() => {
-                setIsRecording(false);
-                // 模拟评分 (随机60-100)
-                const score = Math.floor(Math.random() * 41) + 60;
-                setRecordingScore(score);
-                if (teachingStep === 3) {
-                    setTeachingStep(4);
-                }
-            }, 2000);
+        // 进入下一步（等待学生录音完成）
+        if (teachingStep === 3) {
+            setTeachingStep(4);
         }
     };
 
@@ -197,7 +185,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
             case 'flip':
                 return teachingStep === 2; // 只有在第2步才闪烁
             case 'speak':
-                return teachingStep === 3 && recordingScore === null; // 第3步且未录音
+                return teachingStep === 3 && vocabRecordingScore === null; // 第3步且未录音
             case 'next':
                 return teachingStep === 4; // 第4步（所有步骤完成后）
             default:
@@ -277,31 +265,36 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                         </motion.div>
                                     )}
                                     {/* 跟读状态显示 */}
-                                    {(isRecording || recordingScore !== null) && (
+                                    {(studentRecordingState !== 'idle' || vocabRecordingScore !== null) && (
                                         <motion.div
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             className="absolute bottom-8 left-1/2 -translate-x-1/2"
                                         >
-                                            {isRecording ? (
+                                            {studentRecordingState === 'recording' ? (
                                                 <div className="flex items-center gap-3 px-6 py-3 bg-red-50 border-2 border-red-200 rounded-full">
                                                     <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                                                     <span className="text-red-600 font-bold">录音中...</span>
                                                     <Mic size={18} className="text-red-500" />
                                                 </div>
-                                            ) : recordingScore !== null && (
-                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
+                                            ) : studentRecordingState === 'assessing' ? (
+                                                <div className="flex items-center gap-3 px-6 py-3 bg-amber-50 border-2 border-amber-200 rounded-full">
+                                                    <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
+                                                    <span className="text-amber-600 font-bold">评分中...</span>
+                                                </div>
+                                            ) : vocabRecordingScore !== null && (
+                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${vocabRecordingScore >= 80
                                                     ? 'bg-emerald-50 border-2 border-emerald-200'
                                                     : 'bg-amber-50 border-2 border-amber-200'
                                                     }`}>
-                                                    {recordingScore >= 80 ? (
+                                                    {vocabRecordingScore >= 80 ? (
                                                         <>
                                                             <Sparkles size={18} className="text-emerald-500" />
-                                                            <span className="text-emerald-600 font-bold">发音很棒！{recordingScore}分</span>
+                                                            <span className="text-emerald-600 font-bold">发音很棒！{vocabRecordingScore}分</span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <span className="text-amber-600 font-bold">{recordingScore}分 - 再试一次？</span>
+                                                            <span className="text-amber-600 font-bold">{vocabRecordingScore}分 - 再试一次？</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -403,31 +396,36 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                             </motion.div>
                                         )}
                                         {/* 跟读状态显示 */}
-                                        {(isRecording || recordingScore !== null) && (
+                                        {(studentRecordingState !== 'idle' || vocabRecordingScore !== null) && (
                                             <motion.div
                                                 initial={{ opacity: 0, scale: 0.9 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 className="absolute bottom-8 left-1/2 -translate-x-1/2"
                                             >
-                                                {isRecording ? (
+                                                {studentRecordingState === 'recording' ? (
                                                     <div className="flex items-center gap-3 px-6 py-3 bg-red-50 border-2 border-red-200 rounded-full">
                                                         <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                                                         <span className="text-red-600 font-bold">录音中...</span>
                                                         <Mic size={18} className="text-red-500" />
                                                     </div>
-                                                ) : recordingScore !== null && (
-                                                    <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${recordingScore >= 80
+                                                ) : studentRecordingState === 'assessing' ? (
+                                                    <div className="flex items-center gap-3 px-6 py-3 bg-amber-50 border-2 border-amber-200 rounded-full">
+                                                        <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
+                                                        <span className="text-amber-600 font-bold">评分中...</span>
+                                                    </div>
+                                                ) : vocabRecordingScore !== null && (
+                                                    <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${vocabRecordingScore >= 80
                                                         ? 'bg-emerald-50 border-2 border-emerald-200'
                                                         : 'bg-amber-50 border-2 border-amber-200'
                                                         }`}>
-                                                        {recordingScore >= 80 ? (
+                                                        {vocabRecordingScore >= 80 ? (
                                                             <>
                                                                 <Sparkles size={18} className="text-emerald-500" />
-                                                                <span className="text-emerald-600 font-bold">发音很棒！{recordingScore}分</span>
+                                                                <span className="text-emerald-600 font-bold">发音很棒！{vocabRecordingScore}分</span>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-amber-600 font-bold">{recordingScore}分 - 再试一次？</span>
+                                                                <span className="text-amber-600 font-bold">{vocabRecordingScore}分 - 再试一次？</span>
                                                             </>
                                                         )}
                                                     </div>
@@ -561,7 +559,7 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 跟读按钮 - 只有当前步骤才闪烁 */}
                                 <motion.button
                                     onClick={handleSpeakClick}
-                                    disabled={isRecording}
+                                    disabled={vocabSpeakEnabled}
                                     animate={{
                                         boxShadow: shouldPulse('speak')
                                             ? ['0 0 0 0 rgba(0, 180, 238, 0)', '0 0 0 8px rgba(0, 180, 238, 0.3)', '0 0 0 0 rgba(0, 180, 238, 0)']
@@ -570,13 +568,15 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     transition={shouldPulse('speak') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
                                     className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${shouldPulse('speak')
                                         ? 'bg-[#00B4EE] text-white'
-                                        : isRecording
+                                        : studentRecordingState === 'recording'
                                             ? 'bg-red-500 text-white'
-                                            : 'bg-slate-100 hover:bg-slate-200'
+                                            : studentRecordingState === 'assessing'
+                                                ? 'bg-amber-500 text-white'
+                                                : 'bg-slate-100 hover:bg-slate-200'
                                         }`}
                                 >
                                     <Mic size={14} />
-                                    <span>{isRecording ? '录音中...' : recordingScore !== null ? `${recordingScore}分` : '跟读'}</span>
+                                    <span>{studentRecordingState === 'recording' ? '录音中...' : studentRecordingState === 'assessing' ? '评分中...' : vocabRecordingScore !== null ? `${vocabRecordingScore}分` : '跟读'}</span>
                                 </motion.button>
                             </div>
 
@@ -698,8 +698,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                                 vocabSpeakEnabled: false
                                             });
                                             setTeachingStep(0);
-                                            setIsRecording(false);
-                                            setRecordingScore(null);
+
+
                                         }
                                     }}
                                     disabled={remedialIndex === 0}
@@ -712,8 +712,8 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                     onClick={() => {
                                         useGameStore.getState().completeRemedialWord();
                                         setTeachingStep(0);
-                                        setIsRecording(false);
-                                        setRecordingScore(null);
+
+
                                     }}
                                     className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2"
                                 >
@@ -781,22 +781,24 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 {/* 跟读按钮 */}
                                 <motion.button
                                     onClick={handleSpeakClick}
-                                    disabled={isRecording}
+                                    disabled={vocabSpeakEnabled}
                                     animate={{
                                         boxShadow: shouldPulse('readAloud')
                                             ? ['0 0 0 0 rgba(239, 68, 68, 0)', '0 0 0 8px rgba(239, 68, 68, 0.3)', '0 0 0 0 rgba(239, 68, 68, 0)']
                                             : '0 0 0 0 rgba(239, 68, 68, 0)'
                                     }}
                                     transition={shouldPulse('readAloud') ? { duration: 1.5, repeat: Infinity } : { duration: 0.2 }}
-                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${isRecording
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${studentRecordingState === 'recording'
                                         ? 'bg-red-500 text-white'
-                                        : shouldPulse('readAloud')
-                                            ? 'bg-red-500 text-white'
-                                            : 'bg-slate-100 text-slate-700'
+                                        : studentRecordingState === 'assessing'
+                                            ? 'bg-amber-500 text-white'
+                                            : shouldPulse('readAloud')
+                                                ? 'bg-red-500 text-white'
+                                                : 'bg-slate-100 text-slate-700'
                                         }`}
                                 >
                                     <Mic size={14} />
-                                    <span>{isRecording ? '录音中...' : recordingScore !== null ? `得分: ${recordingScore}` : '跟读'}</span>
+                                    <span>{studentRecordingState === 'recording' ? '录音中...' : studentRecordingState === 'assessing' ? '评分中...' : vocabRecordingScore !== null ? `得分: ${vocabRecordingScore}` : '跟读'}</span>
                                 </motion.button>
                             </div>
 

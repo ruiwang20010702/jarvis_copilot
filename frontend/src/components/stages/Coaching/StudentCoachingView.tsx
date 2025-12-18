@@ -26,6 +26,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         coachingTaskType,
         coachingTaskReceived,
         coachingTaskCompleted,
+        coachingTaskTarget,
         teacherHighlights,
         studentHighlights,
         gpsCardReceived,
@@ -38,10 +39,12 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         highlights, // 实战阶段做题痕迹
         messages,
         addMessage,
-        remoteStream
+        remoteStream,
+        currentCorrectionQuestionId
     } = useGameStore();
 
     const paraRefs = useRef<(HTMLParagraphElement | null)[]>([]);
+    const lastAutoSwitchPhase = useRef<number | null>(null);
     const [activeTab, setActiveTab] = useState<'article' | 'analysis'>('analysis');
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -86,6 +89,21 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         return [];
     }, [articleData.quiz, quizAnswers]);
 
+    // 获取当前错题（用于高亮相关段落）
+    const currentWrongQuestion = useMemo(() => {
+        // 1. 优先使用 store 中指定的当前纠错题目 ID
+        if (currentCorrectionQuestionId) {
+            return articleData.quiz.find(q => q.id === currentCorrectionQuestionId) || null;
+        }
+
+        // 2. Fallback: 查找第一个需要讲解的题目
+        const coachingItem = quizAnalysis.find(q => q.status === 'wrong' || q.status === 'guessed');
+        if (coachingItem) {
+            return articleData.quiz.find(q => q.id === coachingItem.questionId) || null;
+        }
+        return null;
+    }, [quizAnalysis, articleData.quiz, currentCorrectionQuestionId]);
+
     const currentPhaseConfig = getPhaseConfig(coachingPhase);
 
     useEffect(() => {
@@ -99,6 +117,22 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
             paraRefs.current[focusParagraphIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }, [focusParagraphIndex]);
+
+    // 自动跳转页面逻辑
+    useEffect(() => {
+        if (coachingTaskReceived && coachingPhase !== lastAutoSwitchPhase.current) {
+            if (coachingPhase === 2 || coachingPhase === 3) { // 技能召回(GPS) / 路标定位 - 划题干
+                setActiveTab('analysis');
+            } else if (coachingPhase === 4) { // 搜原句 - 划文章
+                setActiveTab('article');
+            } else if (coachingPhase === 5) { // 纠偏锁定 - 重选
+                setActiveTab('analysis');
+            } else if (coachingPhase === 6) { // 技巧复盘
+                setActiveTab('analysis');
+            }
+            lastAutoSwitchPhase.current = coachingPhase;
+        }
+    }, [coachingPhase, coachingTaskReceived]);
 
     const handleStudentTextSelection = () => {
         if (coachingTaskType !== 'highlight' || !coachingTaskReceived) return;
@@ -127,19 +161,43 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                 endOffset: selectedText.length,
                 text: selectedText
             });
-            completeCoachingTask();
+            // 不再自动完成任务，让学生可以继续划词
+            // completeCoachingTask(); 
         }
         setSelectionInfo(null);
         setSelectedText(null);
         window.getSelection()?.removeAllRanges();
     };
 
+    // 学生确认完成划词任务
+    const submitHighlightTask = () => {
+        if (studentHighlights.length > 0) {
+            completeCoachingTask();
+        }
+    };
+
     const handleReceiveTask = () => {
         receiveCoachingTask();
         setShowTaskModal(false);
 
+        // 根据任务类型自动切换标签页
         if (coachingTaskType === 'gps') {
             setShowGpsCard(true);
+        } else if (coachingTaskType === 'select') {
+            // 选择答案任务 → 切换到题目分析
+            setActiveTab('analysis');
+        } else if (coachingTaskType === 'highlight') {
+            // 划词任务：根据目标区域切换
+            if (coachingTaskTarget === 'question') {
+                // 目标是题干 -> 切换到题目分析
+                setActiveTab('analysis');
+            } else {
+                // 默认（如目标是文章） -> 切换到原文
+                setActiveTab('article');
+            }
+        } else if (coachingTaskType === 'voice') {
+            // 语音任务 → 自动开始录音
+            handleStartRecording();
         }
     };
 
@@ -196,7 +254,8 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const handleSelectAnswer = (optionId: string) => {
         setSelectedAnswer(optionId);
         setCoachingReselectedAnswer(optionId); // 同步到 store，供教练端读取
-        if (optionId === COACHING_DEMO_QUESTION.correctAnswer) {
+        // 检查是否选对了正确答案
+        if (currentWrongQuestion && optionId === currentWrongQuestion.correctOption) {
             completeCoachingTask();
         }
     };
@@ -226,6 +285,9 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
     const renderParagraphWithHighlights = (para: string, paraIndex: number) => {
         const isFocused = focusParagraphIndex === paraIndex;
         const isBlur = focusParagraphIndex !== null && !isFocused;
+
+        // 检查当前段落是否是错题相关段落
+        const isRelatedToWrongQuestion = currentWrongQuestion?.relatedParagraphIndices?.includes(paraIndex);
 
         let content: React.ReactNode = para;
 
@@ -278,18 +340,36 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         });
 
         return (
-            <p
+            <div
                 key={paraIndex}
-                ref={el => { if (el) paraRefs.current[paraIndex] = el; }}
-                className={`mb-6 text-lg leading-relaxed font-serif transition-all duration-500 ${isFocused
-                    ? 'text-slate-900 font-medium scale-[1.02] origin-left'
-                    : isBlur
-                        ? 'text-slate-300 opacity-50 blur-[0.5px] scale-[0.98]'
-                        : 'text-slate-700'
-                    } ${coachingTaskType === 'highlight' && coachingTaskReceived && isFocused ? 'cursor-text select-text' : ''}`}
+                ref={el => { if (el) paraRefs.current[paraIndex] = el as HTMLParagraphElement; }}
+                className={`mb-4 p-4 rounded-xl transition-all duration-300 border-2 ${isRelatedToWrongQuestion
+                    ? 'bg-amber-50/50 border-amber-300 shadow-sm'
+                    : isFocused
+                        ? 'bg-blue-50/50 border-blue-200'
+                        : isBlur
+                            ? 'border-transparent opacity-40'
+                            : 'border-transparent'
+                    } ${coachingTaskType === 'highlight' && coachingTaskReceived && !isBlur ? 'cursor-text select-text' : ''}`}
             >
-                {content}
-            </p>
+                {/* 错题相关段落标记 */}
+                {isRelatedToWrongQuestion && (
+                    <div className="text-xs font-bold text-amber-600 mb-2 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        错题相关段落
+                    </div>
+                )}
+                <p className={`text-lg leading-relaxed font-serif transition-colors ${isRelatedToWrongQuestion
+                    ? 'text-slate-800'
+                    : isFocused
+                        ? 'text-slate-900 font-medium'
+                        : isBlur
+                            ? 'text-slate-400'
+                            : 'text-slate-700'
+                    }`}>
+                    {content}
+                </p>
+            </div>
         );
     };
 
@@ -466,15 +546,6 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                 {articleData.title}
                             </h2>
                             {articleData.paragraphs.map((para, i) => renderParagraphWithHighlights(para, i))}
-
-                            <div className="mt-8 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
-                                <div className="text-xs font-bold text-amber-600 mb-2 uppercase tracking-wider">
-                                    错题相关段落
-                                </div>
-                                <p className="text-base leading-relaxed font-serif text-slate-700">
-                                    {COACHING_DEMO_QUESTION.article}
-                                </p>
-                            </div>
                         </div>
                     )}
 
@@ -499,7 +570,11 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                 {quizAnalysis.map((item, idx) => {
                                     const fullQuiz = fullQuizOptions[idx];
                                     if (!fullQuiz) return null;
-                                    const isExpanded = expandedQuestion === item.questionId;
+
+                                    // 检查是否是当前正在纠错的目标题目
+                                    const isTargetQuestion = currentWrongQuestion?.id === item.questionId;
+                                    const isReselecting = coachingTaskType === 'select' && coachingTaskReceived && isTargetQuestion;
+                                    const isExpanded = expandedQuestion === item.questionId || isReselecting;
 
                                     return (
                                         <div
@@ -540,16 +615,18 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-4 text-sm mt-2 ml-11">
-                                                    <span className="text-slate-500">
-                                                        我的答案: <span className={item.isCorrect ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>{item.studentAnswer}</span>
-                                                    </span>
-                                                    {!item.isCorrect && (
+                                                {!isReselecting && (
+                                                    <div className="flex items-center gap-4 text-sm mt-2 ml-11">
                                                         <span className="text-slate-500">
-                                                            正确答案: <span className="text-emerald-600 font-bold">{item.correctAnswer}</span>
+                                                            我的答案: <span className={item.isCorrect ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>{item.studentAnswer}</span>
                                                         </span>
-                                                    )}
-                                                </div>
+                                                        {!item.isCorrect && (
+                                                            <span className="text-slate-500">
+                                                                正确答案: <span className="text-emerald-600 font-bold">{item.correctAnswer}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <AnimatePresence>
@@ -561,17 +638,58 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                         className="border-t border-slate-200/50"
                                                     >
                                                         <div className="p-4 pt-3">
-                                                            {renderQuestionOptions(fullQuiz, item)}
-
-                                                            {item.status === 'wrong' && coachingPhase > 0 && (
-                                                                <div className="mt-4 p-3 bg-rose-100/50 rounded-lg border border-rose-200">
-                                                                    <div className="text-sm font-bold text-rose-700 mb-1">
-                                                                        正在纠正中...
+                                                            {isReselecting ? (
+                                                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                    <div className="text-sm font-bold text-[#00B4EE] mb-3 flex items-center gap-2">
+                                                                        <MousePointer2 size={16} />
+                                                                        请重新选择正确答案
                                                                     </div>
-                                                                    <div className="text-sm text-rose-600/80">
-                                                                        阶段 {coachingPhase}/6: {currentPhaseConfig?.name}
+                                                                    <div className="space-y-3">
+                                                                        {fullQuiz.options.map(opt => {
+                                                                            const isSelected = selectedAnswer === opt.id;
+                                                                            const isCorrectOption = opt.id === fullQuiz.correctAnswer;
+                                                                            const isCorrectlySelected = isSelected && isCorrectOption;
+
+                                                                            return (
+                                                                                <button
+                                                                                    key={opt.id}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleSelectAnswer(opt.id);
+                                                                                    }}
+                                                                                    disabled={coachingTaskCompleted}
+                                                                                    className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all text-sm ${isCorrectlySelected
+                                                                                        ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                                                                                        : isSelected && !isCorrectOption
+                                                                                            ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
+                                                                                        } ${coachingTaskCompleted ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                                >
+                                                                                    <div className="flex gap-3">
+                                                                                        <span className="font-bold">{opt.id}.</span>
+                                                                                        <span className="font-medium font-serif">{opt.text}</span>
+                                                                                    </div>
+                                                                                    {isCorrectlySelected && <CheckCircle2 size={18} className="text-emerald-600" />}
+                                                                                </button>
+                                                                            );
+                                                                        })}
                                                                     </div>
                                                                 </div>
+                                                            ) : (
+                                                                <>
+                                                                    {renderQuestionOptions(fullQuiz, item)}
+
+                                                                    {item.status === 'wrong' && coachingPhase > 0 && (
+                                                                        <div className="mt-4 p-3 bg-rose-100/50 rounded-lg border border-rose-200">
+                                                                            <div className="text-sm font-bold text-rose-700 mb-1">
+                                                                                正在纠正中...
+                                                                            </div>
+                                                                            <div className="text-sm text-rose-600/80">
+                                                                                阶段 {coachingPhase}/6: {currentPhaseConfig?.name}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     </motion.div>
@@ -582,44 +700,7 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                 })}
                             </div>
 
-                            {/* 选择答案任务 */}
-                            {coachingTaskType === 'select' && coachingTaskReceived && (
-                                <div className="mt-8">
-                                    <div className="text-lg font-bold text-slate-800 mb-4">
-                                        重新选择答案
-                                    </div>
-                                    <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4">
-                                            {COACHING_DEMO_QUESTION.question}
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {COACHING_DEMO_QUESTION.options.map(opt => {
-                                                const isSelected = selectedAnswer === opt.id;
-                                                const isCorrect = opt.isCorrect && isSelected;
-                                                return (
-                                                    <button
-                                                        key={opt.id}
-                                                        onClick={() => handleSelectAnswer(opt.id)}
-                                                        disabled={coachingTaskCompleted}
-                                                        className={`w-full p-4 rounded-xl border-2 flex justify-between items-center transition-all ${isCorrect
-                                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                                                            : isSelected && !opt.isCorrect
-                                                                ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                                                : 'bg-white border-slate-200 text-slate-700 hover:border-[#00B4EE] hover:bg-blue-50/50'
-                                                            } ${coachingTaskCompleted ? 'cursor-default' : 'cursor-pointer'}`}
-                                                    >
-                                                        <div className="flex gap-3">
-                                                            <span className="font-bold">{opt.id}.</span>
-                                                            <span className="font-medium">{opt.text}</span>
-                                                        </div>
-                                                        {isCorrect && <CheckCircle2 size={20} className="text-emerald-600" />}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+
 
                             {/* 复盘总结 */}
                             {coachingTaskType === 'review' && coachingTaskReceived && (
@@ -734,13 +815,42 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                                 }`}
                                         >
                                             <Mic size={20} />
-                                            {isTranscribing ? '识别中...' : isRecording ? '点击结束录音' : '点击开始录音'}
+                                            {isTranscribing ? '识别中...' : isRecording ? '✓ 提交任务' : '点击开始录音'}
                                         </button>
+                                    )}
+
+                                    {/* 划词任务：显示已划词数量和提交按钮 */}
+                                    {coachingTaskType === 'highlight' && (
+                                        <div className="mt-4 space-y-2">
+                                            <div className="text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                                                已划词 {studentHighlights.length} 处
+                                                {studentHighlights.length === 0 && '（请在文章中选择文字并确认）'}
+                                            </div>
+                                            <button
+                                                onClick={submitHighlightTask}
+                                                disabled={studentHighlights.length === 0}
+                                                className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${studentHighlights.length > 0
+                                                    ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                    }`}
+                                            >
+                                                <Highlighter size={18} />
+                                                完成划词并提交
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="text-center py-2 text-amber-600 text-sm animate-pulse">
-                                    有新任务，请查看弹窗
+                                <div className="flex flex-col items-center gap-2 py-2">
+                                    <div className="text-center text-amber-600 text-sm animate-pulse">
+                                        有新任务，请查看弹窗
+                                    </div>
+                                    <button
+                                        onClick={handleReceiveTask}
+                                        className="text-xs px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors font-bold"
+                                    >
+                                        手动接收任务
+                                    </button>
                                 </div>
                             )}
                         </div>

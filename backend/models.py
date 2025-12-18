@@ -65,6 +65,7 @@ class Question(Base):
     ai_tutor_script = Column(JSON)
     error_tags = Column(JSON)
     trap_type = Column(String)
+    related_paragraph_indices = Column(JSON)  # 相关段落索引，用于 Coaching 阶段定位原文
     
     created_at = Column(DateTime, default=datetime.utcnow)
 

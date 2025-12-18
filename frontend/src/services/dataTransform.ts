@@ -11,8 +11,6 @@ import type {
 } from './apiService';
 import type { QuizQuestion, QuizOption, VocabItem, SentenceChunk } from '../../store';
 
-// ============ Question Transform ============
-
 /**
  * 转换后端 Question 为前端 QuizQuestion
  * 
@@ -25,6 +23,7 @@ export function transformQuestion(apiQuestion: ApiQuestion): QuizQuestion {
         question: apiQuestion.stem,
         options: apiQuestion.options.map(parseOption),
         correctOption: apiQuestion.correct_answer,
+        relatedParagraphIndices: apiQuestion.related_paragraph_indices || [],
     };
 }
 
@@ -46,11 +45,13 @@ function parseOption(optionStr: string): QuizOption {
  * 转换后端 Version 为前端 articleData
  */
 export function transformVersion(apiVersion: ApiVersion): {
+    versionId: number;
     title: string;
     paragraphs: string[];
     quiz: QuizQuestion[];
 } {
     return {
+        versionId: apiVersion.id,
         title: apiVersion.title || '',
         paragraphs: splitParagraphs(apiVersion.content),
         quiz: apiVersion.questions.map(transformQuestion),

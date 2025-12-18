@@ -38,9 +38,54 @@ class XunfeiPronunciationService:
         
         try:
             from xfyunsdkspeech.ise_client import IseClient
+            import subprocess
+            import tempfile
             
             # 根据文件扩展名判断音频格式
             ext = audio_path.lower().split('.')[-1]
+            actual_audio_path = audio_path
+            temp_pcm_file = None
+            
+            # 如果是 mp4/webm/m4a 格式，需要转换为 PCM
+            if ext in ['mp4', 'webm', 'm4a', 'aac', 'ogg']:
+                logger.info(f"Converting {ext} to PCM format using ffmpeg...")
+                temp_pcm_file = tempfile.NamedTemporaryFile(suffix='.pcm', delete=False)
+                temp_pcm_file.close()
+                
+                try:
+                    # 使用 ffmpeg 转换为 16kHz, 16bit, 单声道 PCM
+                    result = subprocess.run([
+                        'ffmpeg', '-y', '-i', audio_path,
+                        '-ar', '16000',  # 采样率 16kHz
+                        '-ac', '1',      # 单声道
+                        '-f', 's16le',   # 16bit little-endian PCM
+                        temp_pcm_file.name
+                    ], capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode != 0:
+                        logger.error(f"ffmpeg conversion failed: {result.stderr}")
+                        return {
+                            "error": f"Audio conversion failed: {result.stderr[:200]}",
+                            "accuracy": 0, "fluency": 0, "completeness": 0, "overall": 0
+                        }
+                    
+                    actual_audio_path = temp_pcm_file.name
+                    ext = 'pcm'
+                    logger.info(f"Audio converted successfully to {actual_audio_path}")
+                except FileNotFoundError:
+                    logger.error("ffmpeg not found. Please install ffmpeg.")
+                    return {
+                        "error": "ffmpeg not installed",
+                        "accuracy": 0, "fluency": 0, "completeness": 0, "overall": 0
+                    }
+                except subprocess.TimeoutExpired:
+                    logger.error("ffmpeg conversion timed out")
+                    return {
+                        "error": "Audio conversion timeout",
+                        "accuracy": 0, "fluency": 0, "completeness": 0, "overall": 0
+                    }
+            
+            # 确定音频编码
             if ext == 'mp3':
                 aue = 'lame'
             elif ext == 'speex':
@@ -48,7 +93,7 @@ class XunfeiPronunciationService:
             else:
                 aue = 'raw'  # PCM/WAV
             
-            logger.info(f"Using audio encoding: {aue} for file: {audio_path}")
+            logger.info(f"Using audio encoding: {aue} for file: {actual_audio_path}")
             
             # 初始化客户端
             client = IseClient(
@@ -62,7 +107,7 @@ class XunfeiPronunciationService:
             )
             
             # 读取音频文件
-            with open(audio_path, 'rb') as f:
+            with open(actual_audio_path, 'rb') as f:
                 # 发送评测请求
                 # 英文单词评测需要 [word] 标记
                 formatted_text = f'[word] {reference_text}'
@@ -71,6 +116,14 @@ class XunfeiPronunciationService:
                     if chunk.get("data"):
                         result_xml = base64.b64decode(chunk["data"]).decode('utf-8')
                         logger.info(f"Xunfei result received")
+            
+            # 清理临时文件
+            if temp_pcm_file:
+                import os as os_module
+                try:
+                    os_module.unlink(temp_pcm_file.name)
+                except:
+                    pass
             
             if result_xml:
                 return self._parse_result_xml(result_xml)

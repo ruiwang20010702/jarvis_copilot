@@ -60,18 +60,31 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
     }, [currentVocabIndex, remedialIndex, exitPassStep]);
 
     useEffect(() => {
-        if (isPlayingAudio === 'standard') {
+        if (isPlayingAudio === 'standard' && currentCard) {
             setRecordingState('playing_standard');
+
+            // 实际播放音频（教师端同步过来的播放事件）
+            if (currentCard.audioSrc && currentCard.audioSrc.length > 0) {
+                const audioUrl = currentCard.audioSrc.startsWith('http')
+                    ? currentCard.audioSrc
+                    : `${import.meta.env.VITE_API_URL || 'https://localhost:8000'}${currentCard.audioSrc}`;
+                const audio = new Audio(audioUrl);
+                audio.play().catch((error) => {
+                    console.error('[StudentVocab] Audio playback failed:', error);
+                });
+            }
+
             const timer = setTimeout(() => {
                 setRecordingState(prev => prev === 'playing_standard' ? 'idle' : prev);
             }, 2000);
             return () => clearTimeout(timer);
         }
-    }, [isPlayingAudio]);
+    }, [isPlayingAudio, currentCard]);
 
     // 点击切换录音状态
     const handleRecordToggle = async (e: React.SyntheticEvent) => {
         e.preventDefault();
+        console.log('[StudentVocab] handleRecordToggle called', { vocabSpeakEnabled, recordingState });
         if (recordingState === 'finished') return;
 
         if (recordingState === 'idle') {
@@ -79,27 +92,49 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
             try {
                 await audioRecorder.startRecording();
                 setRecordingState('recording');
+                // 同步录音状态到教师端
+                useGameStore.setState({ studentRecordingState: 'recording' });
             } catch (error) {
                 console.error('Failed to start recording:', error);
+                // 显示用户可见的错误提示
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (errorMessage.includes('Permission') || errorMessage.includes('NotAllowed')) {
+                    alert('📵 麦克风权限被拒绝\n\n请在浏览器地址栏点击锁头图标，允许麦克风访问后重试。');
+                } else if (errorMessage.includes('NotFound') || errorMessage.includes('Requested device not found')) {
+                    alert('🎤 未找到麦克风\n\n请确保您的设备有麦克风并且已正确连接。');
+                } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                    alert('🔒 需要 HTTPS 连接\n\n录音功能需要安全连接（HTTPS）。请使用 HTTPS 访问本页面。');
+                } else {
+                    alert(`❌ 录音启动失败\n\n${errorMessage}`);
+                }
             }
         } else if (recordingState === 'recording') {
             // 结束录音并评分
             try {
                 const audioBlob = await audioRecorder.stopRecording();
                 setRecordingState('playing_user'); // 显示"正在评分"状态
+                // 同步评分中状态到教师端
+                useGameStore.setState({ studentRecordingState: 'assessing' });
 
                 // 调用评分 API
                 if (currentCard?.word) {
                     const result = await assessPronunciation(audioBlob, currentCard.word);
                     console.log('Pronunciation result:', result);
 
-                    setScore(Math.round(result.overall));
+                    const finalScore = Math.round(result.overall);
+                    setScore(finalScore);
                     setRecordingState('finished');
                     setVocabCardFlipped(true);
+                    // 保存到 store 以同步给教师端
+                    useGameStore.setState({
+                        vocabRecordingScore: finalScore,
+                        studentRecordingState: 'finished'
+                    });
                 }
             } catch (error) {
                 console.error('Failed to stop recording or assess:', error);
                 setRecordingState('idle');
+                useGameStore.setState({ studentRecordingState: 'idle' });
             }
         }
     };
@@ -371,18 +406,15 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     </div>
                 )}
 
-                {/* 录音完成后显示分数徽章 */}
-                {!isRemedialMode && recordingState === 'finished' && score && (
+                {/* 录音完成后显示完成提示（不显示分数，分数只在教师端显示） */}
+                {!isRemedialMode && recordingState === 'finished' && (
                     <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="absolute bottom-8 left-0 w-full flex justify-center z-20"
                     >
-                        <div className={`px-8 py-3 rounded-full font-bold text-lg shadow-xl flex items-center gap-3 ${score >= 80
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-amber-500 text-white'
-                            }`}>
-                            {score >= 80 ? '🎉' : '💪'} 得分: {score}
+                        <div className="px-8 py-3 rounded-full font-bold text-lg shadow-xl flex items-center gap-3 bg-emerald-500 text-white">
+                            ✅ 录音完成
                         </div>
                     </motion.div>
                 )}

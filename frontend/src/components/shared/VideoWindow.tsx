@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { User, Volume2, VolumeX } from 'lucide-react';
+import { useGameStore } from '../../../store';
 
 interface VideoWindowProps {
     /**
@@ -58,7 +59,8 @@ export const VideoWindow: React.FC<VideoWindowProps> = ({
     disableLayoutAnimation = false,
     videoStream
 }) => {
-    const [isMuted, setIsMuted] = useState(false);
+    // 使用全局 store 的静音状态，切换阶段时不会丢失
+    const { isMuted, setIsMuted } = useGameStore();
     const videoRef = React.useRef<HTMLVideoElement>(null);
 
     React.useEffect(() => {

@@ -26,8 +26,8 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
 
     const generateActivities = (): Activity[] => {
         const activities: Activity[] = [];
-        lookups.forEach((word, i) => {
-            activities.push({ id: `lookup - ${i} `, type: 'lookup', timestamp: `16: 25:${30 + i} `, content: 'Alex 查询单词', detail: word });
+        lookups.forEach((lookup, i) => {
+            activities.push({ id: `lookup - ${i} `, type: 'lookup', timestamp: `16: 25:${30 + i} `, content: 'Alex 查询单词', detail: lookup.word });
         });
         highlights.forEach((h, i) => {
             activities.push({ id: `highlight - ${i} `, type: 'highlight', timestamp: `16: 24:${40 + i} `, content: 'Alex 高亮了', detail: h.text.substring(0, 25) });
