@@ -424,6 +424,9 @@ export interface ChatContext {
     question_type?: string;
     wrong_count?: number;
     question_index?: number;
+    module_type?: 'coaching' | 'surgery';
+    current_sentence?: string;
+    surgery_chunks?: any[];
 }
 
 /**

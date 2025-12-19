@@ -47,12 +47,6 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
     result = await db.execute(query)
     vocab_card = result.scalars().first()
     
-    # 如果指定了 version_id 但没找到，尝试找一个通用的（version_id is NULL）或者其他版本的作为参考？
-    # 目前策略：如果没找到，就生成新的。这样确保每个版本都有自己的卡片（如果需要特定上下文）。
-    # 或者：如果找到了其他版本的，可以复用内容但创建新卡片？
-    # 为了简单和准确性（上下文可能不同），我们重新生成或复制。
-    # 这里我们先尝试找一个"通用"的作为缓存命中优化（如果内容一样）。
-    
     if not vocab_card and request.version_id:
         # 尝试查找任意版本的同名卡片，用于复用（避免 LLM 调用）
         fallback_query = select(VocabCard).where(VocabCard.word.ilike(word)).limit(1)
@@ -117,4 +111,3 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
         audio_url=vocab_data.get("audio_url"),
         ai_memory_hint=vocab_data.get("ai_memory_hint"),
     )
-

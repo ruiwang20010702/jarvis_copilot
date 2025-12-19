@@ -125,6 +125,9 @@ interface GameStore {
   // Surgery State (Phase 5)
   surgeryMode: SurgeryMode;
   surgeryChunks: SentenceChunk[];
+  surgeryList: { originalSentence: string; translation: string; chunks: SentenceChunk[] }[];
+  currentSurgeryIndex: number;
+  hasSurgeryData: boolean; // 标记是否加载了真实数据
 
   // Skill State (Phase 2 - The Armory)
   skillNode: number; // 0=waiting, 1=concept, 2=metaphor, 3=action, 4=verify, 5=complete
@@ -151,7 +154,7 @@ interface GameStore {
   setQuickReplies: (replies: string[]) => void;
 
   // Battle Actions
-  addLookup: (word: string, context?: string, versionId?: number) => void;
+  addLookup: (word: string, context?: string, versionId?: number) => Promise<void>;
   addHighlight: (text: string) => void;
   removeHighlight: (id: string) => void;
   setQuizAnswer: (qId: number, oId: string, isUnsure: boolean) => void;
@@ -197,6 +200,7 @@ interface GameStore {
 
   // Surgery Actions
   setSurgeryMode: (mode: SurgeryMode) => void;
+  setCurrentSurgeryIndex: (index: number) => void;
   removeChunk: (id: string) => void;
   restoreChunk: (id: string) => void;
   restoreSentence: () => void;
@@ -226,15 +230,15 @@ interface GameStore {
   setIsMuted: (muted: boolean) => void;
 
   reset: () => void;
+  loadMockSurgeryData: () => void;
 }
 
 // Mock Data
 const MOCK_ARTICLE = {
-  title: "The Rise of Youth Basketball",
+  title: "The Future of Biodegradable Robots",
   paragraphs: [
-    "In recent years, the landscape of youth basketball has undergone a seismic shift. What was once a seasonal recreational activity has morphed into a year-round, high-stakes industry. Families pour significant resources into travel teams, private coaching, and specialized training camps, driven by the elusive dream of college scholarships or professional contracts.",
-    "However, this professionalization of youth sports comes at a cost. Orthopedic surgeons are reporting a sharp rise in overuse injuries among adolescents, a phenomenon rarely seen a generation ago. The pressure to specialize early often leads to burnout, robbing young athletes of the simple joy of play. Moreover, the financial barrier to entry has widened, creating a disparity where elite training is accessible only to the affluent.",
-    "Despite these challenges, the benefits of team sports remain undeniable. Basketball teaches resilience, teamwork, and discipline. The key lies in finding a balance—fostering development without sacrificing the physical and mental well-being of the child. Coaches and parents must navigate this delicate line to ensure the game remains a positive force in young lives."
+    "Scientists have been working on new ways to protect the environment. One exciting area of research is biodegradable robots. These robots are made from materials that can break down naturally without harming the earth.",
+    "Wei and Zhang, two leading researchers in this field, have developed a prototype that can swim in the ocean to collect data. Wei and Zhang believe that biodegradable robots like these have a bright future. They hope that one day, these robots will be used to monitor pollution in all the world's oceans."
   ],
   quiz: [
     {
@@ -317,6 +321,33 @@ const MOCK_VOCAB_DB: Record<string, VocabItem> = {
     mnemonic: '💡 巧记：Com (共同) + prehend (抓住/理解) -> 把所有的方面都抓住了 -> 全面的。',
     audioSrc: ''
   },
+  'environmental': {
+    word: 'environmental',
+    syllables: ['en', 'vi', 'ron', 'men', 'tal'],
+    definition: 'adj. 环境的；有关环境的 (此句中指与自然环境保护相关的)',
+    phonetic: '/ɪnˌvaɪrənˈmentl/',
+    contextSentence: 'Environmental protection is a global concern.',
+    mnemonic: '💡 巧记：En (在...中) + viron (环绕) + ment (名词) + al (形容词) -> 环绕在我们周围的 -> 环境的。',
+    audioSrc: '/static/audio/environmental.mp3'
+  },
+  'disappear': {
+    word: 'disappear',
+    syllables: ['dis', 'ap', 'pear'],
+    definition: 'v. 消失；失踪；不复存在',
+    phonetic: '/ˌdɪsəˈpɪə(r)/',
+    contextSentence: 'The sun disappeared behind the clouds.',
+    mnemonic: '💡 巧记：Dis (不/相反) + appear (出现) -> 出现的反面 -> 消失。',
+    audioSrc: '/static/audio/disappear.mp3'
+  },
+  'recent': {
+    word: 'recent',
+    syllables: ['re', 'cent'],
+    definition: 'adj. 最近的；近来的；新近的',
+    phonetic: '/ˈriːsnt/',
+    contextSentence: 'In recent years, technology has changed rapidly.',
+    mnemonic: '💡 巧记：Re (再) + cent (百/分) -> 像最近才分出的新钱一样 -> 新近的。',
+    audioSrc: '/static/audio/recent.mp3'
+  },
   'default': {
     word: 'Unknown',
     syllables: ['un', 'known'],
@@ -333,6 +364,22 @@ const INITIAL_SURGERY_CHUNKS: SentenceChunk[] = [
   { id: 'c2', text: 'won', type: 'core', isRemoved: false },
   { id: 'm2', text: 'many national', type: 'modifier', isRemoved: false },
   { id: 'c3', text: 'awards.', type: 'core', isRemoved: false }
+];
+
+const MOCK_SURGERY_DATA = [
+  {
+    originalSentence: "Wei and Zhang believe that biodegradable robots like these have a bright future.",
+    translation: "魏和张相信，像这样的可生物降解机器人有着光明的未来。",
+    chunks: [
+      { id: 's1-c1', text: 'Wei and Zhang', type: 'core' as const, isRemoved: false },
+      { id: 's1-c2', text: 'believe', type: 'core' as const, isRemoved: false },
+      { id: 's1-m1', text: 'that', type: 'modifier' as const, isRemoved: false },
+      { id: 's1-c3', text: 'biodegradable robots', type: 'core' as const, isRemoved: false },
+      { id: 's1-m2', text: 'like these', type: 'modifier' as const, isRemoved: false },
+      { id: 's1-c4', text: 'have', type: 'core' as const, isRemoved: false },
+      { id: 's1-c5', text: 'a bright future.', type: 'core' as const, isRemoved: false }
+    ]
+  }
 ];
 
 const generateVocabItem = (word: string): VocabItem => {
@@ -403,6 +450,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Surgery Defaults
   surgeryMode: 'observation',
   surgeryChunks: INITIAL_SURGERY_CHUNKS,
+  surgeryList: [],
+  currentSurgeryIndex: 0,
+  hasSurgeryData: false,
 
   // Skill Defaults
   skillNode: 0,
@@ -436,12 +486,43 @@ export const useGameStore = create<GameStore>((set, get) => ({
   })),
   setQuickReplies: (replies) => set({ quickReplies: replies }),
 
-  addLookup: (word: string, context?: string, versionId?: number) => set((state) => {
+  addLookup: async (word: string, context?: string, versionId?: number) => {
+    const state = get();
     if (state.currentStage !== 'coaching' && (state.lookups.length >= state.lookupLimit || state.lookups.some(l => l.word === word))) {
-      return state;
+      return;
     }
-    return { lookups: [...state.lookups, { word, context: context || '', versionId }] };
-  }),
+
+    // 立即检查是否有本地 Mock 数据，如果有则直接使用，加速演示
+    const lowerWord = word.toLowerCase().replace(/[^a-z]/g, '');
+    if (MOCK_VOCAB_DB[lowerWord]) {
+      console.log('[Store] Using mock data for fast demo:', word);
+      const mockResult = MOCK_VOCAB_DB[lowerWord];
+      set((state) => ({
+        lookups: [...state.lookups, { word, context: context || '', versionId }],
+        vocabList: [...state.vocabList, mockResult],
+        vocabStatus: { ...state.vocabStatus, [word]: 'unseen' }
+      }));
+      return;
+    }
+
+    // 立即调用后端 API 保存查词记录
+    try {
+      console.log('[Store] Looking up and saving word:', word, 'versionId:', versionId);
+      const result = await lookupWord(word, context || '', versionId);
+
+      set((state) => ({
+        lookups: [...state.lookups, { word, context: context || '', versionId }]
+      }));
+
+      console.log('[Store] Word saved successfully:', word);
+    } catch (error) {
+      console.error('[Store] Failed to save lookup word:', word, error);
+      // 即使失败也添加到本地列表，保证 UI 响应
+      set((state) => ({
+        lookups: [...state.lookups, { word, context: context || '', versionId }]
+      }));
+    }
+  },
   addHighlight: (text) => set((state) => ({
     highlights: [...state.highlights, { id: Math.random().toString(36).substring(7), text, color: 'yellow' }]
   })),
@@ -468,15 +549,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const apiVersion = await fetchVersion(articleId, level);
       const articleData = transformVersion(apiVersion);
 
-      // 转换难句数据（取第一个难句作为默认）
+      // 转换所有难句数据
+      let surgeryList: { originalSentence: string; translation: string; chunks: SentenceChunk[] }[] = [];
       let surgeryChunks = INITIAL_SURGERY_CHUNKS;
+
       if (apiVersion.sentence_surgeries && apiVersion.sentence_surgeries.length > 0) {
-        const firstSurgery = transformSentenceSurgery(apiVersion.sentence_surgeries[0]);
-        surgeryChunks = firstSurgery.chunks;
-        console.log('[Store] Loaded surgery chunks:', surgeryChunks);
+        // TODO: 测试阶段只取第一句长难句
+        surgeryList = apiVersion.sentence_surgeries.slice(0, 1).map(s => transformSentenceSurgery(s));
+        surgeryChunks = surgeryList[0].chunks;
+        console.log('[Store] Loaded surgery list:', surgeryList.length, 'sentences (limited to 1 for testing)');
       }
 
-      set({ articleData, surgeryChunks, isLoading: false });
+      set({
+        articleData,
+        surgeryList,
+        surgeryChunks,
+        currentSurgeryIndex: 0,
+        hasSurgeryData: surgeryList.length > 0,
+        isLoading: false
+      });
       console.log('[Store] Loaded version:', articleId, level, articleData);
     } catch (error) {
       console.error('[Store] Failed to load version:', error);
@@ -495,25 +586,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const vocabItems: VocabItem[] = [];
     const vocabStatus: Record<string, 'unseen' | 'learning' | 'mastered'> = {};
 
-    for (const lookup of lookups) {
+    // 串行加载以确保顺序（或者并行加载 Promise.all）
+    const promises = lookups.map(async (lookup) => {
       try {
         const result = await lookupWord(lookup.word, lookup.context, lookup.versionId);
-        vocabItems.push(transformLookupResult(result));
-        vocabStatus[lookup.word] = 'unseen';
+        return {
+          item: transformLookupResult(result),
+          word: lookup.word
+        };
       } catch (error) {
-        console.error('[Store] Failed to lookup word:', lookup.word, error);
-        // Fallback to basic vocab item
-        vocabItems.push({
-          word: lookup.word,
-          syllables: [lookup.word],
-          definition: `Definition for '${lookup.word}' not available`,
-          contextSentence: '',
-          mnemonic: '',
-          audioSrc: '',
-        });
-        vocabStatus[lookup.word] = 'unseen';
+        console.error('[Store] Failed to lookup word during load:', lookup.word, error);
+        return {
+          item: {
+            word: lookup.word,
+            syllables: [lookup.word],
+            definition: `Definition for '${lookup.word}' not available`,
+            contextSentence: '',
+            mnemonic: '',
+            audioSrc: '',
+          },
+          word: lookup.word
+        };
       }
-    }
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(res => {
+      vocabItems.push(res.item);
+      vocabStatus[res.word] = 'unseen';
+    });
 
     set({
       vocabList: vocabItems,
@@ -746,6 +847,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Surgery Actions
   setSurgeryMode: (mode) => set({ surgeryMode: mode }),
 
+  setCurrentSurgeryIndex: (index) => set((state) => {
+    if (index < 0 || index >= state.surgeryList.length) return state;
+    const nextSurgery = state.surgeryList[index];
+    return {
+      currentSurgeryIndex: index,
+      surgeryChunks: nextSurgery.chunks.map(c => ({ ...c, isRemoved: false })) // 切换时重置状态
+    };
+  }),
+
   removeChunk: (id) => set((state) => ({
     surgeryChunks: state.surgeryChunks.map(c =>
       c.id === id ? { ...c, isRemoved: true } : c
@@ -775,6 +885,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         )
       }));
     }, 500);
+  },
+
+  loadMockSurgeryData: () => {
+    const data = MOCK_SURGERY_DATA;
+    set({
+      surgeryList: data,
+      surgeryChunks: data[0].chunks,
+      currentSurgeryIndex: 0,
+      hasSurgeryData: true,
+      currentStage: 'surgery'
+    });
+    console.log('[Store] Mock surgery data loaded');
   },
 
   // Skill Actions
@@ -892,6 +1014,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     isPlayingAudio: 'none',
     surgeryMode: 'observation',
     surgeryChunks: INITIAL_SURGERY_CHUNKS,
+    surgeryList: [],
+    currentSurgeryIndex: 0,
     skillNode: 0,
     studentHasEquipped: false,
     studentConfirmedFormula: false,

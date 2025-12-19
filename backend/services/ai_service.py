@@ -142,15 +142,13 @@ class AIService:
 ai_service = AIService()
 
 
-def generate_stream_with_tools(
+async def generate_stream_with_tools(
     messages: list,
     tools: list = None,
     system_prompt: str = None
 ):
     """
-    流式生成对话响应，支持 Function Calling（同步版本）
-    
-    注意：这是一个同步 generator，因为 Gemini 的流式 API 返回的是同步迭代器
+    流式生成对话响应，支持 Function Calling（异步版本）
     
     Args:
         messages: 对话历史 [{"role": "user/assistant", "content": "..."}]
@@ -282,7 +280,7 @@ def convert_tools_to_openai_format(tools: list) -> list:
     return openai_tools
 
 
-def generate_stream_with_tools_doubao(
+async def generate_stream_with_tools_doubao(
     messages: list,
     tools: list = None,
     system_prompt: str = None
@@ -325,31 +323,38 @@ def generate_stream_with_tools_doubao(
     
     # 添加工具
     if tools:
-        request_body["tools"] = convert_tools_to_openai_format(tools)
+        openai_tools = convert_tools_to_openai_format(tools)
+        request_body["tools"] = openai_tools
+        print(f"[AIService] 🛠️ Tools being sent to Doubao: {[t['function']['name'] for t in openai_tools]}")
+    else:
+        print("[AIService] ⚠️ No tools provided to Doubao")
     
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
     
+    print(f"[AIService] 🚀 Sending request to Doubao... (Messages: {len(openai_messages)})")
+    
     full_text = ""
     tool_calls_buffer = {}  # 用于收集流式 tool call 片段
+    yielded_tool_calls = set() # 记录已发送的工具调用索引
     
     try:
-        with httpx.Client(timeout=60.0) as client:
-            with client.stream(
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
                 "POST",
                 f"{base_url}/chat/completions",
                 json=request_body,
                 headers=headers
             ) as response:
                 if response.status_code != 200:
-                    error_text = response.read().decode()
-                    print(f"[Doubao] API error: {response.status_code} - {error_text}")
+                    error_text = await response.aread()
+                    print(f"[Doubao] API error: {response.status_code} - {error_text.decode()}")
                     yield {"type": "error", "content": f"Doubao API error: {response.status_code}"}
                     return
                 
-                for line in response.iter_lines():
+                async for line in response.aiter_lines():
                     if not line or line == "data: [DONE]":
                         continue
                     
@@ -389,35 +394,42 @@ def generate_stream_with_tools_doubao(
                                 if finish_reason == "tool_calls":
                                     # 输出收集到的工具调用
                                     for idx, tc_data in tool_calls_buffer.items():
-                                        try:
-                                            args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
-                                        except json.JSONDecodeError:
-                                            args = {}
-                                        
-                                        print(f"[Doubao] 🔧 Tool call: {tc_data['name']}")
-                                        print(f"[Doubao] 🔧 Arguments: {args}")
-                                        yield {
-                                            "type": "tool_call",
-                                            "content": {
-                                                "name": tc_data["name"],
-                                                "arguments": args
+                                        if idx not in yielded_tool_calls:
+                                            try:
+                                                args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                                            except json.JSONDecodeError:
+                                                args = {}
+                                            
+                                            print(f"[Doubao] 🔧 Tool call (finish_reason): {tc_data['name']}")
+                                            yield {
+                                                "type": "tool_call",
+                                                "content": {
+                                                    "name": tc_data["name"],
+                                                    "arguments": args
+                                                }
                                             }
-                                        }
+                                            yielded_tool_calls.add(idx)
                                 
                         except json.JSONDecodeError:
                             continue
         
-        # 兜底：如果流结束了但 buffer 里还有工具调用没输出（可能 finish_reason 不是 tool_calls）
+        # 兜底：如果流结束了但 buffer 里还有工具调用没输出
         if tool_calls_buffer:
             for idx, tc_data in tool_calls_buffer.items():
-                # 检查这个工具调用是否已经输出过（这里简单处理，如果 name 存在且 args 可解析就输出）
-                if tc_data["name"]:
+                if idx not in yielded_tool_calls and tc_data["name"]:
                     try:
                         args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
                     except json.JSONDecodeError:
-                        args = {}
+                        # 尝试修复不完整的 JSON（常见于流式截断）
+                        arg_str = tc_data["arguments"].strip()
+                        if arg_str and not arg_str.endswith("}"):
+                            arg_str += '"}' # 尝试补全
+                        try:
+                            args = json.loads(arg_str)
+                        except:
+                            args = {}
                     
-                    print(f"[Doubao] 🔧 Final check tool call: {tc_data['name']}")
+                    print(f"[Doubao] 🔧 Tool call (fallback): {tc_data['name']}")
                     yield {
                         "type": "tool_call",
                         "content": {
@@ -425,7 +437,7 @@ def generate_stream_with_tools_doubao(
                             "arguments": args
                         }
                     }
-            # 清空 buffer 避免重复
+                    yielded_tool_calls.add(idx)
             tool_calls_buffer.clear()
 
         print(f"[Doubao] Stream complete. Full text length: {len(full_text)}")
@@ -438,7 +450,7 @@ def generate_stream_with_tools_doubao(
         yield {"type": "error", "content": str(e)}
 
 
-def get_coaching_ai_generator(messages: list, tools: list, system_prompt: str):
+async def get_coaching_ai_generator(messages: list, tools: list, system_prompt: str):
     """
     根据配置获取对应的 AI 生成器
     
@@ -450,7 +462,9 @@ def get_coaching_ai_generator(messages: list, tools: list, system_prompt: str):
     
     if provider == "doubao":
         print("[AIService] 🔥 Using Doubao for coaching")
-        return generate_stream_with_tools_doubao(messages, tools, system_prompt)
+        async for event in generate_stream_with_tools_doubao(messages, tools, system_prompt):
+            yield event
     else:
         print("[AIService] 💎 Using Gemini for coaching")
-        return generate_stream_with_tools(messages, tools, system_prompt)
+        async for event in generate_stream_with_tools(messages, tools, system_prompt):
+            yield event

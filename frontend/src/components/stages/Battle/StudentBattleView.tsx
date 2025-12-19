@@ -30,6 +30,7 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     const [selectedText, setSelectedText] = useState("");
     const [selectedLocation, setSelectedLocation] = useState<{ paragraphIndex: number, startOffset: number, endOffset: number } | null>(null);
     const [lookupWord, setLookupWord] = useState<string | null>(null);
+    const [isLookingUp, setIsLookingUp] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [pendingAnswer, setPendingAnswer] = useState<{ questionId: number, optionId: string } | null>(null);
     const [clickedWord, setClickedWord] = useState<{ word: string, rect: DOMRect, paragraphIndex: number } | null>(null);
@@ -166,12 +167,14 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         }
     };
 
-    const confirmLookup = () => {
+    const confirmLookup = async () => {
         if (selectedText && lookups.length < lookupLimit && selectedLocation) {
+            setIsLookingUp(true);
+            setLookupWord(selectedText);
             // 获取包含该单词的段落作为上下文
             const context = articleData.paragraphs[selectedLocation.paragraphIndex] || '';
-            addLookup(selectedText, context, articleData.versionId);
-            setLookupWord(selectedText);
+            await addLookup(selectedText, context, articleData.versionId);
+            setIsLookingUp(false);
             setSelectionRect(null);
             window.getSelection()?.removeAllRanges();
         }
@@ -183,12 +186,14 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         setClickedWord({ word, rect, paragraphIndex });
     };
 
-    const handleWordLookup = () => {
+    const handleWordLookup = async () => {
         if (clickedWord && lookups.length < lookupLimit) {
+            setIsLookingUp(true);
+            setLookupWord(clickedWord.word);
             // 获取包含该单词的段落作为上下文
             const context = articleData.paragraphs[clickedWord.paragraphIndex] || '';
-            addLookup(clickedWord.word, context, articleData.versionId);
-            setLookupWord(clickedWord.word);
+            await addLookup(clickedWord.word, context, articleData.versionId);
+            setIsLookingUp(false);
             setClickedWord(null);
         }
     };
@@ -597,19 +602,37 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 <div>
                                     <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">释义</div>
                                     <div className="text-slate-700 leading-relaxed">
-                                        {lookupWord.toLowerCase() === 'youth' && '青少年；年轻人；青春时期'}
-                                        {lookupWord.toLowerCase() === 'camp' && '营地；训练营；夏令营'}
-                                        {lookupWord.toLowerCase() === 'professionalization' && '职业化；专业化'}
-                                        {lookupWord.toLowerCase() === 'orthopedic' && '整形外科的；骨科的'}
-                                        {lookupWord.toLowerCase() === 'surgeons' && '外科医生（复数）'}
-                                        {lookupWord.toLowerCase() === 'overuse' && '过度使用；滥用'}
-                                        {lookupWord.toLowerCase() === 'injuries' && '伤害；损伤（复数）'}
-                                        {lookupWord.toLowerCase() === 'adolescents' && '青少年（复数）'}
-                                        {lookupWord.toLowerCase() === 'phenomenon' && '现象；奇迹'}
-                                        {lookupWord.toLowerCase() === 'burnout' && '倦怠；精疲力竭'}
-                                        {lookupWord.toLowerCase() === 'disparity' && '差距；不平等'}
-                                        {!['youth', 'camp', 'professionalization', 'orthopedic', 'surgeons', 'overuse', 'injuries', 'adolescents', 'phenomenon', 'burnout', 'disparity'].includes(lookupWord.toLowerCase()) &&
-                                            `"${lookupWord}" 的定义和例句`}
+                                        {isLookingUp ? (
+                                            <div className="flex items-center gap-2 text-cyan-600 font-medium">
+                                                <motion.div
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                >
+                                                    <Search size={16} />
+                                                </motion.div>
+                                                Jarvis 正在分析单词...
+                                            </div>
+                                        ) : (
+                                            (() => {
+                                                const vocabItem = useGameStore.getState().vocabList.find(v => v.word.toLowerCase() === lookupWord.toLowerCase());
+                                                if (vocabItem) {
+                                                    return (
+                                                        <div className="space-y-2">
+                                                            <div className="text-lg font-medium text-slate-800">{vocabItem.definition}</div>
+                                                            {vocabItem.phonetic && (
+                                                                <div className="text-sm text-slate-500 font-serif">{vocabItem.phonetic}</div>
+                                                            )}
+                                                            {vocabItem.mnemonic && (
+                                                                <div className="mt-3 p-3 bg-amber-50 rounded-xl text-sm text-amber-800 border border-amber-100 italic">
+                                                                    {vocabItem.mnemonic}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                return `"${lookupWord}" 的定义加载中...`;
+                                            })()
+                                        )}
                                     </div>
                                 </div>
 

@@ -9,6 +9,7 @@ import { Sparkles, Send, Mic, Highlighter, MousePointer2, Navigation, Trophy, Lo
 import { useStreamingChat, TypewriterText, StreamingMessageBubble } from '../../shared/StreamingChat';
 import { ChatContext } from '../../../services/apiService';
 import { useGameStore } from '../../../../store';
+import { generateQuizAnalysis } from './config';
 
 interface StreamingChatPanelProps {
     context: ChatContext;
@@ -319,8 +320,11 @@ export const StreamingChatPanel: React.FC<StreamingChatPanelProps> = ({
                         >
                             {(() => {
                                 // 检查是否还有其他错题
-                                const { articleData, quizAnswers, currentCorrectionQuestionId } = useGameStore.getState();
-                                const { generateQuizAnalysis } = require('./config');
+                                const state = useGameStore.getState();
+                                const { articleData, quizAnswers, currentCorrectionQuestionId } = state;
+
+                                if (!articleData?.quiz || !quizAnswers) return '完成带练';
+
                                 const analysis = generateQuizAnalysis({
                                     quiz: articleData.quiz,
                                     quizAnswers

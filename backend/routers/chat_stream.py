@@ -35,8 +35,17 @@ _chat_sessions: Dict[str, Dict] = {}
 
 def get_system_prompt(context: Dict = None) -> str:
     """获取系统提示词"""
-    # 读取 prompt 模板
-    prompt_path = os.path.join(os.path.dirname(__file__), "../prompts/coaching_tutor_v2.md")
+    module_type = context.get('module_type', 'coaching') if context else 'coaching'
+    
+    # 根据模块类型选择 prompt 模板
+    if module_type == 'surgery':
+        prompt_file = "surgery_tutor.md"
+    else:
+        prompt_file = "coaching_tutor_v2.md"
+        
+    prompt_path = os.path.join(os.path.dirname(__file__), f"../prompts/{prompt_file}")
+    print(f"[get_system_prompt] Loading prompt from: {prompt_file}")
+    
     system_prompt = ""
     if os.path.exists(prompt_path):
         with open(prompt_path, "r", encoding="utf-8") as f:
@@ -44,47 +53,53 @@ def get_system_prompt(context: Dict = None) -> str:
     
     # 如果有上下文，替换 prompt 中的占位符
     if context:
-        # 定义不同题型的解题技巧
-        skills_map = {
-            "细节理解题": """步骤1. 题干关键词定位：找到题目中的关键词（如时间、地点、人物或事件)
-步骤2. 翻译题干：翻译题干意思，关注特殊疑问词，理解需要回答内容 （原因、具体事物、时间、人物、地点、方式）
-步骤3. 文章信息定位：通过题干关键词迅速在文章中找到答题段落和句子
-步骤4. 仔细阅读答题段落和句子，与选项对比，选出最符合的答案""",
-            
-            "主旨大意题": """步骤1. 通读全文：快速通读文章，获取整体概念和主题
-步骤2. 寻找主题句：每段的第一句或最后一句通常是主题句，帮助归纳段落大意
-步骤3. 概括总结：结合每段主旨和文章概念，总结文章主旨
-步骤4. 验证选项：将选项对比总结的文章主旨，选出最接近的答案""",
-            
-            "推理判断题": """步骤1. 回归文章信息：明确题干要求，找到相关段落或相关句子作为答题依据
-步骤2. 理解表面含义：翻译相关段落或句子，关注上下文
-步骤3. 分析隐含信息：关注相关句子和段落处的隐含信息，结合上下文进行逻辑推理
-步骤4. 验证选项：将选项逐一与所推断内容对比，选出与推断内容一致的答案""",
-            
-            "词义猜测题": """步骤1. 翻译上下文：仔细阅读目标词前后的句子，进行翻译
-步骤2. 注意逻辑关系：通过翻译分析上下文与目标词之间的逻辑关系，判断词义倾向
-步骤3. 结合语境推测：结合逻辑关系和上下文翻译，推测生词意思
-步骤4. 验证选项：将选项逐一代入到目标词处，检查是否符合猜测的意思，选出正确选项""",
-            
-            "代词指代题": """步骤1. 定位代词：识别题干中相关的代词，并定位代词在原文的位置
-步骤2. 理解上下文：阅读并翻译代词前后的句子或段落
-步骤3. 分析关系：判断代词与句子中的其他部分的指代关系，明确指代内容
-步骤4. 替换验证：将选项代入代词所在句子，验证是否符合语义和逻辑"""
-        }
-
-        # 获取当前题型的解题技巧，默认为细节理解题
-        q_type = context.get('question_type', '细节理解题')
-        current_skills = skills_map.get(q_type, skills_map["细节理解题"])
-
         # 准备替换数据
         replacements = {
             "{{article_content}}": context.get('article_content', ''),
-            "{{question_stem}}": context.get('question_stem', ''),
-            "{{options}}": json.dumps(context.get('options', []), ensure_ascii=False, indent=2),
-            "{{correct_answer}}": context.get('correct_answer', ''),
-            "{{question_type}}": q_type,
-            "{{solving_skills}}": context.get('solving_skills', current_skills)
+            "{{current_sentence}}": context.get('current_sentence', ''),
+            "{{surgery_chunks}}": json.dumps(context.get('surgery_chunks', []), ensure_ascii=False, indent=2)
         }
+
+        if module_type == 'coaching':
+            # 定义不同题型的解题技巧（仅用于 coaching 模块）
+            skills_map = {
+                "细节理解题": """步骤1. 题干关键词定位：找到题目中的关键词（如时间、地点、人物或事件)
+步骤2. 翻译题干：翻译题干意思，关注特殊疑问词，理解需要回答内容 （原因、具体事物、时间、人物、地点、方式）
+步骤3. 文章信息定位：通过题干关键词迅速在文章中找到答题段落和句子
+步骤4. 仔细阅读答题段落和句子，与选项对比，选出最符合的答案""",
+                
+                "主旨大意题": """步骤1. 通读全文：快速通读文章，获取整体概念和主题
+步骤2. 寻找主题句：每段的第一句或最后一句通常是主题句，帮助归纳段落大意
+步骤3. 概括总结：结合每段主旨和文章概念，总结文章主旨
+步骤4. 验证选项：将选项对比总结的文章主旨，选出最接近的答案""",
+                
+                "推理判断题": """步骤1. 回归文章信息：明确题干要求，找到相关段落或相关句子作为答题依据
+步骤2. 理解表面含义：翻译相关段落或句子，关注上下文
+步骤3. 分析隐含信息：关注相关句子和段落处的隐含信息，结合上下文进行逻辑推理
+步骤4. 验证选项：将选项逐一与所推断内容对比，选出与推断内容一致的答案""",
+                
+                "词义猜测题": """步骤1. 翻译上下文：仔细阅读目标词前后的句子，进行翻译
+步骤2. 注意逻辑关系：通过翻译分析上下文与目标词之间的逻辑关系，判断词义倾向
+步骤3. 结合语境推测：结合逻辑关系和上下文翻译，推测生词意思
+步骤4. 验证选项：将选项代入到目标词处，检查是否符合猜测的意思，选出正确选项""",
+                
+                "代词指代题": """步骤1. 定位代词：识别题干中相关的代词，并定位代词在原文的位置
+步骤2. 理解上下文：阅读并翻译代词前后的句子或段落
+步骤3. 分析关系：判断代词与句子中的其他部分的指代关系，明确指代内容
+步骤4. 替换验证：将选项代入代词所在句子，验证是否符合语义和逻辑"""
+            }
+
+            # 获取当前题型的解题技巧，默认为细节理解题
+            q_type = context.get('question_type', '细节理解题')
+            current_skills = skills_map.get(q_type, skills_map["细节理解题"])
+            
+            replacements.update({
+                "{{question_stem}}": context.get('question_stem', ''),
+                "{{options}}": json.dumps(context.get('options', []), ensure_ascii=False, indent=2),
+                "{{correct_answer}}": context.get('correct_answer', ''),
+                "{{question_type}}": q_type,
+                "{{solving_skills}}": context.get('solving_skills', current_skills)
+            })
         
         # 执行替换
         for key, value in replacements.items():
@@ -125,10 +140,14 @@ async def generate_sse_stream(request: ChatRequest):
     tool_calls = []
     
     try:
-        # get_coaching_ai_generator 根据配置选择 Gemini 或 Doubao
-        for event in get_coaching_ai_generator(
+        # 根据模块类型选择工具集
+        from services.agents.coaching_tools import SURGERY_TOOLS
+        module_type = session["context"].get('module_type', 'coaching')
+        tools = SURGERY_TOOLS if module_type == 'surgery' else COACHING_TOOLS
+        
+        async for event in get_coaching_ai_generator(
             messages=messages,
-            tools=COACHING_TOOLS,
+            tools=tools,
             system_prompt=system_prompt
         ):
             if event["type"] == "text":
@@ -192,14 +211,18 @@ async def chat_stream(request: ChatRequest):
 
 async def generate_init_stream(request: ChatRequest):
     """生成初始化问候语的 SSE 流"""
+    print("[generate_init_stream] v3 - Using async for loop")
     import uuid
     from services.ai_service import get_coaching_ai_generator
-    from services.agents.coaching_tools import COACHING_TOOLS
+    from services.agents.coaching_tools import COACHING_TOOLS, SURGERY_TOOLS
     
     session_id = request.session_id or str(uuid.uuid4())
     
     # 创建会话
     context = request.context or {}
+    print(f"[generate_init_stream] Received context: {context}")
+    print(f"[generate_init_stream] module_type in context: {context.get('module_type', 'NOT FOUND')}")
+    
     _chat_sessions[session_id] = {
         "messages": [],
         "context": context,
@@ -218,15 +241,23 @@ async def generate_init_stream(request: ChatRequest):
         # 可以选择性地发送一个完成信号或工具调用
         return
 
-    init_message = "开始教学，请执行 Phase 1 诊断步骤。"
+    # 根据模块类型设置初始化消息
+    module_type = context.get('module_type', 'coaching')
+    if module_type == 'surgery':
+        init_message = "请开始难句讲解教学，第一步是询问我对句子的初步理解。"
+    else:
+        init_message = "开始教学，请执行 Phase 1 诊断步骤。"
     
     full_greeting = ""
     tool_calls = []
     
+    # 根据模块类型选择工具集
+    tools = SURGERY_TOOLS if module_type == 'surgery' else COACHING_TOOLS
+    
     try:
-        for event in get_coaching_ai_generator(
+        async for event in get_coaching_ai_generator(
             messages=[{"role": "user", "content": init_message}],
-            tools=COACHING_TOOLS,
+            tools=tools,
             system_prompt=system_prompt
         ):
             if event["type"] == "text":
@@ -240,11 +271,16 @@ async def generate_init_stream(request: ChatRequest):
                 yield f"data: {data}\n\n"
     except Exception as e:
         print(f"[ChatInit Stream] AI generation failed: {e}")
+        import traceback
+        traceback.print_exc()
         # Fallback
         student_name = context.get("student_name", "同学")
-        question_index = context.get("question_index", 1)
-        full_greeting = f"哎呀 {student_name}，第 {question_index} 题掉坑里了 🙈"
-        tool_calls = [{"name": "publish_voice_task", "arguments": {"instruction": "请用语音告诉我你的想法"}}]
+        if module_type == 'surgery':
+            full_greeting = f"你好 {student_name}！现在我们一起看看这句长难句。你对这句子的初步理解是什么呢？🤔"
+        else:
+            question_index = context.get("question_index", 1)
+            full_greeting = f"哎呀 {student_name}，第 {question_index} 题掉坑里了 🙈"
+        
         yield f"data: {json.dumps({'type': 'text', 'content': full_greeting}, ensure_ascii=False)}\n\n"
     
     # 如果 AI 只返回 tool_call 没有文本，使用 instruction 作为问候语
@@ -325,16 +361,24 @@ async def init_chat_session(request: ChatRequest):
     # 使用 AI 生成初始问候语
     system_prompt = get_system_prompt(context)
     
-    # 构建初始消息，让 AI 以 Phase 1 诊断开始
-    init_message = "开始教学，请执行 Phase 1 诊断步骤。"
+    # 根据模块类型设置初始化消息
+    module_type = context.get('module_type', 'coaching')
+    if module_type == 'surgery':
+        init_message = "请开始难句讲解教学，第一步是询问我对句子的初步理解。"
+    else:
+        init_message = "开始教学，请执行 Phase 1 诊断步骤。"
     
     full_greeting = ""
     tool_calls = []
     
+    # 根据模块类型选择工具集
+    from services.agents.coaching_tools import SURGERY_TOOLS
+    tools = SURGERY_TOOLS if module_type == 'surgery' else COACHING_TOOLS
+    
     try:
-        for event in get_coaching_ai_generator(
+        async for event in get_coaching_ai_generator(
             messages=[{"role": "user", "content": init_message}],
-            tools=COACHING_TOOLS,
+            tools=tools,
             system_prompt=system_prompt
         ):
             if event["type"] == "text":
@@ -345,10 +389,13 @@ async def init_chat_session(request: ChatRequest):
         print(f"[ChatInit] AI generation failed: {e}")
         # Fallback 到固定问候语
         student_name = context.get("student_name", "同学")
-        question_index = context.get("question_index", 1)
-        student_answer = context.get("student_answer", "?")
-        full_greeting = f"哎呀 {student_name}，第 {question_index} 题掉坑里了 🙈\n\n你选了 {student_answer}，能悄悄告诉 Jarvis 为什么选它吗？"
-        tool_calls = [{"name": "publish_voice_task", "arguments": {"instruction": "请用语音告诉我你的想法"}}]
+        if module_type == 'surgery':
+            full_greeting = f"你好 {student_name}！现在我们一起看看这句长难句。你对这句子的初步理解是什么呢？🤔"
+        else:
+            question_index = context.get("question_index", 1)
+            student_answer = context.get("student_answer", "?")
+            full_greeting = f"哎呀 {student_name}，第 {question_index} 题掉坑里了 🙈\n\n你选了 {student_answer}，能悄悄告诉 Jarvis 为什么选它吗？"
+            tool_calls = [{"name": "publish_voice_task", "arguments": {"instruction": "请用语音告诉我你的想法"}}]
     
     # 如果 AI 只返回了 tool_call 没有文本，使用 tool_call 的 instruction 作为问候语
     if not full_greeting.strip() and tool_calls:

@@ -128,11 +128,17 @@ export function useStreamingChat(options: UseStreamingChatOptions): UseStreaming
 
     // 初始化会话（流式）
     const initSession = useCallback(async () => {
-        // 防止重复调用
-        if (initializingRef.current || sessionId) {
-            console.log('[StreamingChat] Already initialized or initializing, skipping...');
+        // 如果已经有 sessionId，说明已经初始化成功，跳过
+        if (sessionId) {
             return;
         }
+
+        // 防止并发重复调用
+        if (initializingRef.current) {
+            console.log('[StreamingChat] Already initializing, skipping...');
+            return;
+        }
+
         initializingRef.current = true;
 
         setIsLoading(true);
@@ -197,6 +203,7 @@ export function useStreamingChat(options: UseStreamingChatOptions): UseStreaming
             }
         } finally {
             setIsLoading(false);
+            initializingRef.current = false;
         }
     }, [context, generateId, onToolCall, onError, sessionId]);
 
@@ -338,6 +345,11 @@ export const StreamingMessageBubble: React.FC<StreamingMessageBubbleProps> = ({ 
             return () => clearTimeout(timeoutId);
         }
     }, [message.content, message.isStreaming, isAssistant, displayedText]);
+
+    // 如果内容为空，不渲染气泡
+    if (!message.content && !message.isStreaming) {
+        return null;
+    }
 
     return (
         <motion.div

@@ -164,6 +164,7 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                 const response = await initAgent({
                     module_type: 'coaching',
                     context: {
+                        module_type: 'coaching', // 显式传递，确保后端 init_chat_session 能拿到
                         question_id: currentWrongQuestion.id,
                         student_answer: currentWrongQuestion.studentAnswer,
                         correct_answer: currentWrongQuestion.correctOption,

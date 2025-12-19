@@ -45,6 +45,25 @@
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
       }
+      /* Custom scrollbar - visible and styled */
+      .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 3px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0, 180, 238, 0.4);
+          border-radius: 3px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 180, 238, 0.6);
+      }
+      .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0, 180, 238, 0.4) rgba(0, 0, 0, 0.05);
+      }
     </style>
   <script type="importmap">
 {

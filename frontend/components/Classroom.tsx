@@ -134,9 +134,9 @@ const Classroom: React.FC = () => {
     // 加载文章版本数据
     // TODO: articleId 和 level 应该从路由或配置中获取
     useEffect(() => {
-        // 加载文章 ID 4 的 L1 版本（version_id=10）
+        // 加载文章 ID 4 的 L2 版本（version_id=11）
         const articleId = 4;
-        const level = 'L1';
+        const level = 'L2';
 
         console.log('[Classroom] Loading version data for article:', articleId, level);
         loadVersion(articleId, level);
@@ -267,7 +267,7 @@ const Classroom: React.FC = () => {
             </div>
 
 
-            <DevControls />
+            {/* <DevControls /> */}
         </div>
     );
 

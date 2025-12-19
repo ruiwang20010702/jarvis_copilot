@@ -98,3 +98,63 @@ def get_tool_by_name(name: str) -> dict:
         if tool["name"] == name:
             return tool
     return None
+
+
+# 难句讲解阶段可用的工具
+SURGERY_TOOLS = [
+    {
+        "name": "publish_voice_task",
+        "description": "发布语音任务，让学生用语音回答问题。当需要学生解释对句子的理解、翻译句子成分、或回答开放性问题时使用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "instruction": {
+                    "type": "string",
+                    "description": "给学生的任务说明，如'请告诉我你对这个句子的理解'"
+                }
+            },
+            "required": ["instruction"]
+        }
+    },
+    {
+        "name": "publish_highlight_task",
+        "description": "发布画线任务，让学生在句子中标记关键词句。当需要学生定位核心成分或修饰语时使用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "instruction": {
+                    "type": "string",
+                    "description": "给学生的任务说明，如'请在句子中画出主语部分'"
+                },
+                "target": {
+                    "type": "string",
+                    "description": "画线目标区域: article (文章) 或 question (题干)"
+                }
+            },
+            "required": ["instruction", "target"]
+        }
+    },
+    {
+        "name": "show_sentence_structure",
+        "description": "展示句子结构分解图，帮助学生可视化理解句子成分。",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "complete_surgery",
+        "description": "结束当前长难句讲解，进入下一句或完成教学。当学生已经理解句子含义和结构后使用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "总结本句讲解要点"
+                }
+            },
+            "required": ["summary"]
+        }
+    }
+]

@@ -77,49 +77,19 @@ function splitParagraphs(content: string): string[] {
  * 前端格式: [{ id: "c1", text: "The coach", type: "core" }, ...]
  */
 export function transformChunksVisual(
-    chunksVisual: { core: string[]; modifier: string[] } | null
+    chunksVisual: any[] | null
 ): SentenceChunk[] {
-    if (!chunksVisual) return [];
+    if (!chunksVisual || !Array.isArray(chunksVisual)) return [];
 
-    const result: SentenceChunk[] = [];
-
-    // 转换 core 部分
-    chunksVisual.core.forEach((text, index) => {
-        result.push({
-            id: `c${index + 1}`,
-            text,
-            type: 'core',
-            isRemoved: false,
-        });
-    });
-
-    // 转换 modifier 部分
-    chunksVisual.modifier.forEach((text, index) => {
-        result.push({
-            id: `m${index + 1}`,
-            text,
-            type: 'modifier',
-            isRemoved: false,
-        });
-    });
-
-    return result;
+    return chunksVisual.map((chunk, index) => ({
+        id: `chunk-${index}`,
+        text: chunk.text || '',
+        type: chunk.type === 'modifier' ? 'modifier' : 'core',
+        isRemoved: false,
+    }));
 }
 
-/**
- * 按原句顺序排列 chunks
- * 需要根据文本在原句中的位置排序
- */
-export function sortChunksByPosition(
-    chunks: SentenceChunk[],
-    originalSentence: string
-): SentenceChunk[] {
-    return [...chunks].sort((a, b) => {
-        const posA = originalSentence.indexOf(a.text);
-        const posB = originalSentence.indexOf(b.text);
-        return posA - posB;
-    });
-}
+// 移除 sortChunksByPosition，因为后端现在直接返回有序列表
 
 /**
  * 完整转换难句数据
@@ -131,13 +101,12 @@ export function transformSentenceSurgery(surgery: ApiSentenceSurgery): {
     coreSentence: string;
     coachScript: Record<string, string> | null;
 } {
-    const chunks = transformChunksVisual(surgery.chunks_visual);
-    const sortedChunks = sortChunksByPosition(chunks, surgery.original_sentence);
+    const chunks = transformChunksVisual(surgery.chunks_visual as any);
 
     return {
         originalSentence: surgery.original_sentence,
         translation: surgery.translation,
-        chunks: sortedChunks,
+        chunks: chunks, // 直接使用有序列表
         coreSentence: surgery.core_sentence,
         coachScript: surgery.coach_script,
     };
