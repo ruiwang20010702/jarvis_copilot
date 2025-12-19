@@ -68,23 +68,34 @@ function splitParagraphs(content: string): string[] {
         .filter(Boolean);
 }
 
-// ============ Surgery Transform ============
-
 /**
  * 转换后端 chunks_visual 为前端 SentenceChunk[]
+ * 并合并 structure_data 中的详细成分标签
  * 
- * 后端格式: { core: ["The coach", "won"], modifier: ["that trained..."] }
- * 前端格式: [{ id: "c1", text: "The coach", type: "core" }, ...]
+ * 后端格式: 
+ *   chunks_visual: [{ text: "The coach", type: "core" }, ...]
+ *   structure_data: { components: [{ text: "The coach", label: "主语" }, ...] }
+ * 前端格式: [{ id: "c1", text: "The coach", type: "core", label: "主语" }, ...]
  */
 export function transformChunksVisual(
-    chunksVisual: any[] | null
+    chunksVisual: any[] | null,
+    structureData?: { components?: { text: string; label: string }[] } | null
 ): SentenceChunk[] {
     if (!chunksVisual || !Array.isArray(chunksVisual)) return [];
+
+    // 创建 text -> label 的映射表
+    const labelMap = new Map<string, string>();
+    if (structureData?.components) {
+        structureData.components.forEach(comp => {
+            labelMap.set(comp.text.trim(), comp.label);
+        });
+    }
 
     return chunksVisual.map((chunk, index) => ({
         id: `chunk-${index}`,
         text: chunk.text || '',
         type: chunk.type === 'modifier' ? 'modifier' : 'core',
+        label: labelMap.get((chunk.text || '').trim()) || undefined,
         isRemoved: false,
     }));
 }
@@ -101,16 +112,20 @@ export function transformSentenceSurgery(surgery: ApiSentenceSurgery): {
     coreSentence: string;
     coachScript: Record<string, string> | null;
 } {
-    const chunks = transformChunksVisual(surgery.chunks_visual as any);
+    const chunks = transformChunksVisual(
+        surgery.chunks_visual as any,
+        surgery.structure_data as any
+    );
 
     return {
         originalSentence: surgery.original_sentence,
         translation: surgery.translation,
-        chunks: chunks, // 直接使用有序列表
+        chunks: chunks,
         coreSentence: surgery.core_sentence,
         coachScript: surgery.coach_script,
     };
 }
+
 
 // ============ Vocab Transform ============
 

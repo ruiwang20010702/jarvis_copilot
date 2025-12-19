@@ -284,13 +284,20 @@ class XunfeiSTTService:
                 # 所以我们不只检查 200，而是尝试解析任何 JSON 响应
                 try:
                     data = response.json()
+                    logger.debug(f"[Xunfei] Query response: {response.status_code} - {data}")
                 except:
-                    logger.warning(f"[Xunfei] Query non-JSON response: {response.status_code}")
+                    logger.warning(f"[Xunfei] Query non-JSON response: {response.status_code} - {response.text}")
                     await asyncio.sleep(interval)
                     continue
                 
                 task_data = data.get("data", {})
                 status = task_data.get("task_status")
+                code = data.get("code")
+                
+                # 处理错误码 20304（识别结果为空）
+                if code == 20304:
+                    logger.warning("[Xunfei] Recognition result empty (code 20304) - possibly no speech in audio")
+                    return ""
                 
                 # 状态: 1-处理中, 2-处理中, 4-成功, -1-失败
                 if status == "4" or status == 4:

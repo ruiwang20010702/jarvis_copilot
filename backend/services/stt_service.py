@@ -98,9 +98,24 @@ class STTService:
             return None
             
         try:
+            # 根据文件扩展名确定 MIME 类型
+            ext = filename.lower().split('.')[-1] if '.' in filename else 'webm'
+            mime_types = {
+                'webm': 'audio/webm',
+                'mp3': 'audio/mpeg',
+                'mp4': 'audio/mp4',
+                'm4a': 'audio/mp4',
+                'wav': 'audio/wav',
+                'ogg': 'audio/ogg',
+                'flac': 'audio/flac',
+            }
+            mime_type = mime_types.get(ext, 'audio/webm')
+            
+            logger.info(f"[STT] Groq: filename={filename}, mime_type={mime_type}, size={len(audio_data)} bytes")
+            
             async with httpx.AsyncClient(timeout=30.0) as client:
                 files = {
-                    "file": (filename, audio_data, "audio/webm"),
+                    "file": (filename, audio_data, mime_type),
                 }
                 data = {
                     "model": "whisper-large-v3",  # 使用完整版模型

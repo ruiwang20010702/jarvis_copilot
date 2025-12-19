@@ -11,6 +11,13 @@ from routers import users, articles, sessions, websocket, vocab, ai, chat_stream
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s: %(message)s'
+)
+
 app = FastAPI(
     title="Jarvis Backend API",
     description="Backend service for S9 Reading Classroom",

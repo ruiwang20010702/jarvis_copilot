@@ -571,14 +571,30 @@ async def assess_pronunciation(
     """
     from services.pronunciation_service import pronunciation_service
     import tempfile
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # 记录请求信息
+    content = await audio.read()
+    logger.info(f"[Pronunciation API] Received audio: filename={audio.filename}, size={len(content)} bytes, text='{text}'")
+    
+    if len(content) == 0:
+        logger.error("[Pronunciation API] Empty audio file received")
+        return PronunciationResponse(
+            accuracy=0, fluency=0, completeness=0, overall=0,
+            error="Empty audio file"
+        )
     
     # 保存临时文件
-    # Azure SDK 需要文件路径
     suffix = os.path.splitext(audio.filename)[1] if audio.filename else ".wav"
+    logger.info(f"[Pronunciation API] File extension: {suffix}")
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-        content = await audio.read()
         temp_audio.write(content)
         temp_audio_path = temp_audio.name
+    
+    logger.info(f"[Pronunciation API] Saved to temp file: {temp_audio_path}")
     
     try:
         # 调用评估服务
@@ -586,6 +602,8 @@ async def assess_pronunciation(
             audio_path=temp_audio_path,
             reference_text=text
         )
+        
+        logger.info(f"[Pronunciation API] Result: accuracy={result.get('accuracy')}, overall={result.get('overall')}, error={result.get('error')}")
         
         return PronunciationResponse(
             accuracy=result.get("accuracy", 0),

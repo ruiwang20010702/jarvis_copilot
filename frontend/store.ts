@@ -60,6 +60,7 @@ export type SentenceChunk = {
   id: string;
   text: string;
   type: 'core' | 'modifier'; // core=主干(不可切), modifier=修饰(可切)
+  label?: string; // 详细成分标签（主语、谓语、宾语等）
   isRemoved: boolean; // true=被切除(隐藏)
   shake?: boolean; // true=触发错误抖动动画
 };
@@ -100,6 +101,7 @@ interface GameStore {
   coachingTaskTarget: 'article' | 'question' | null; // 任务目标区域（主要用于划词）
   coachingTaskReceived: boolean; // 学生是否已接收任务
   coachingTaskCompleted: boolean; // 学生是否已完成任务
+  coachingTaskInstruction: string | null; // 任务具体指令/描述
   teacherHighlights: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }[]; // 教师红色画线
   studentHighlights: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }[]; // 学生黄色画线（做题痕迹）
   gpsCardReceived: boolean; // 学生是否接收了GPS卡
@@ -119,7 +121,8 @@ interface GameStore {
   isSyllableMode: boolean;
   isPlayingAudio: 'none' | 'student' | 'standard';
   vocabSpeakEnabled: boolean; // 老师是否已启动跟读阶段
-  vocabRecordingScore: number | null; // 学生的发音评分
+  vocabRecordingScore: number | null; // 学生的发音评分（综合分）
+  vocabRecordingDetail: { accuracy: number; fluency: number; completeness: number } | null; // 详细评分
   studentRecordingState: 'idle' | 'recording' | 'assessing' | 'finished'; // 学生录音状态
 
   // Surgery State (Phase 5)
@@ -128,6 +131,7 @@ interface GameStore {
   surgeryList: { originalSentence: string; translation: string; chunks: SentenceChunk[] }[];
   currentSurgeryIndex: number;
   hasSurgeryData: boolean; // 标记是否加载了真实数据
+  showSurgeryStructure: boolean; // 是否展示句子结构标签
 
   // Skill State (Phase 2 - The Armory)
   skillNode: number; // 0=waiting, 1=concept, 2=metaphor, 3=action, 4=verify, 5=complete
@@ -177,7 +181,7 @@ interface GameStore {
   // 6步教学 Actions
   advanceCoachingPhase: () => void; // 教师推进到下一阶段
   setCoachingPhase: (phase: 0 | 1 | 2 | 3 | 4 | 5 | 6) => void;
-  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review', target?: 'article' | 'question') => void; // 教师发布任务
+  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review', target?: 'article' | 'question', instruction?: string) => void; // 教师发布任务
   receiveCoachingTask: () => void; // 学生接收任务
   completeCoachingTask: () => void; // 学生完成任务
   addTeacherHighlight: (highlight: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }) => void;
@@ -200,6 +204,7 @@ interface GameStore {
 
   // Surgery Actions
   setSurgeryMode: (mode: SurgeryMode) => void;
+  setShowSurgeryStructure: (show: boolean) => void;
   setCurrentSurgeryIndex: (index: number) => void;
   removeChunk: (id: string) => void;
   restoreChunk: (id: string) => void;
@@ -425,6 +430,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   coachingTaskTarget: null,
   coachingTaskReceived: false,
   coachingTaskCompleted: false,
+  coachingTaskInstruction: null,
   teacherHighlights: [],
   studentHighlights: [],
   gpsCardReceived: false,
@@ -445,6 +451,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isPlayingAudio: 'none',
   vocabSpeakEnabled: false,
   vocabRecordingScore: null,
+  vocabRecordingDetail: null,
   studentRecordingState: 'idle',
 
   // Surgery Defaults
@@ -453,6 +460,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   surgeryList: [],
   currentSurgeryIndex: 0,
   hasSurgeryData: false,
+  showSurgeryStructure: false,
 
   // Skill Defaults
   skillNode: 0,
@@ -654,9 +662,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     coachingTaskReceived: false,
     coachingTaskCompleted: false
   }),
-  publishCoachingTask: (type, target) => set({
+  publishCoachingTask: (type, target = null, instruction = null) => set({
     coachingTaskType: type,
-    coachingTaskTarget: target || null,
+    coachingTaskTarget: target,
+    coachingTaskInstruction: instruction,
     coachingTaskReceived: false,
     coachingTaskCompleted: false,
     studentHighlights: [] // 重置学生之前的划词
@@ -846,6 +855,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Surgery Actions
   setSurgeryMode: (mode) => set({ surgeryMode: mode }),
+  setShowSurgeryStructure: (show) => set({ showSurgeryStructure: show }),
 
   setCurrentSurgeryIndex: (index) => set((state) => {
     if (index < 0 || index >= state.surgeryList.length) return state;
@@ -997,6 +1007,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     coachingTaskType: null,
     coachingTaskReceived: false,
     coachingTaskCompleted: false,
+    coachingTaskInstruction: null,
     teacherHighlights: [],
     studentHighlights: [],
     gpsCardReceived: false,
@@ -1016,6 +1027,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     surgeryChunks: INITIAL_SURGERY_CHUNKS,
     surgeryList: [],
     currentSurgeryIndex: 0,
+    showSurgeryStructure: false,
     skillNode: 0,
     studentHasEquipped: false,
     studentConfirmedFormula: false,

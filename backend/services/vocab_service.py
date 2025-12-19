@@ -45,7 +45,7 @@ class VocabService:
             "phonetic": None,
             "definition": None,
             "syllables": [],
-            "example": context_sentence or "",  # 使用原句作为例句
+            "example": self._extract_sentence_with_word(context_sentence, word) if context_sentence else "",
             "audio_url": None,
             "ai_memory_hint": None,
         }
@@ -150,6 +150,36 @@ class VocabService:
                 syllables.append(current)
         
         return syllables if syllables else [word]
+    
+    def _extract_sentence_with_word(self, text: str, word: str) -> str:
+        """从文本中提取包含目标单词的那一句话"""
+        if not text or not word:
+            return ""
+        
+        # 用正则按句子拆分（考虑 . ! ? 作为句子结束符）
+        # 但要注意 Mr. Dr. 等缩写不应该拆分
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+        
+        # 如果没有合理拆分，尝试更简单的方式
+        if len(sentences) <= 1:
+            sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        # 查找包含目标单词的句子（不区分大小写）
+        word_lower = word.lower()
+        for sentence in sentences:
+            # 检查单词是否在句子中（作为独立单词）
+            if re.search(rf'\b{re.escape(word_lower)}\b', sentence.lower()):
+                return sentence.strip()
+        
+        # 如果没找到完全匹配，尝试部分匹配（词根）
+        word_stem = word_lower.rstrip('seding')  # 简单去除常见词尾
+        if len(word_stem) >= 3:
+            for sentence in sentences:
+                if word_stem in sentence.lower():
+                    return sentence.strip()
+        
+        # 如果还是没找到，返回第一句
+        return sentences[0].strip() if sentences else text
     
     async def _generate_tts(self, word: str) -> Optional[str]:
         """生成 TTS 音频并保存到文件"""

@@ -149,14 +149,29 @@ SURGERY_TOOLS = [
         }
     },
     {
+        "name": "remove_modifier",
+        "description": "移除指定的修饰语。用于逐步淡出修饰语，让学生一步步看到句子简化的过程。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chunk_text": {
+                    "type": "string",
+                    "description": "要移除的修饰语文本，如 'like these' 或 'that biodegradable robots'"
+                }
+            },
+            "required": ["chunk_text"]
+        }
+    },
+    {
         "name": "simplify_sentence",
-        "description": "执行视觉降维，淡出句子中的修饰语，只保留核心主干。",
+        "description": "一键移除所有修饰语，只保留核心主干。适用于不需要逐步淡出的场景。",
         "parameters": {
             "type": "object",
             "properties": {},
             "required": []
         }
     },
+
     {
         "name": "restore_sentence",
         "description": "复原完整句子，显示所有之前淡出的修饰语。",
@@ -176,6 +191,21 @@ SURGERY_TOOLS = [
         }
     },
     {
+
+        "name": "publish_student_surgery_task",
+        "description": "发布学生实操任务：让学生自己点击删除修饰语，保留主干句，然后提交。用于检验学生是否掌握了句子结构。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "instruction": {
+                    "type": "string",
+                    "description": "给学生的提示，如'请删除所有修饰语，保留主干句'"
+                }
+            },
+            "required": ["instruction"]
+        }
+    },
+    {
         "name": "complete_surgery",
         "description": "结束当前长难句讲解，进入下一句或完成教学。当学生已经理解句子含义和结构后使用。",
         "parameters": {
@@ -190,3 +220,4 @@ SURGERY_TOOLS = [
         }
     }
 ]
+

@@ -44,22 +44,24 @@ class XunfeiPronunciationService:
             # 根据文件扩展名判断音频格式
             ext = audio_path.lower().split('.')[-1]
             actual_audio_path = audio_path
-            temp_pcm_file = None
+            temp_file = None
             
-            # 如果是 mp4/webm/m4a 格式，需要转换为 PCM
-            if ext in ['mp4', 'webm', 'm4a', 'aac', 'ogg']:
-                logger.info(f"Converting {ext} to PCM format using ffmpeg...")
-                temp_pcm_file = tempfile.NamedTemporaryFile(suffix='.pcm', delete=False)
-                temp_pcm_file.close()
+            # 无论什么格式，都统一转换为 16kHz MP3（确保讯飞能正确识别）
+            # 浏览器录音的 WAV 可能是 48kHz，讯飞需要 16kHz
+            if ext in ['mp4', 'webm', 'm4a', 'aac', 'ogg', 'wav']:
+                logger.info(f"Converting {ext} to MP3 format using ffmpeg...")
+                import tempfile as tmp_module
+                temp_file = tmp_module.NamedTemporaryFile(suffix='.mp3', delete=False)
+                temp_file.close()
                 
                 try:
-                    # 使用 ffmpeg 转换为 16kHz, 16bit, 单声道 PCM
+                    # 使用 ffmpeg 转换为 MP3 格式
                     result = subprocess.run([
                         'ffmpeg', '-y', '-i', audio_path,
                         '-ar', '16000',  # 采样率 16kHz
                         '-ac', '1',      # 单声道
-                        '-f', 's16le',   # 16bit little-endian PCM
-                        temp_pcm_file.name
+                        '-b:a', '64k',   # 比特率
+                        temp_file.name
                     ], capture_output=True, text=True, timeout=30)
                     
                     if result.returncode != 0:
@@ -69,9 +71,20 @@ class XunfeiPronunciationService:
                             "accuracy": 0, "fluency": 0, "completeness": 0, "overall": 0
                         }
                     
-                    actual_audio_path = temp_pcm_file.name
-                    ext = 'pcm'
-                    logger.info(f"Audio converted successfully to {actual_audio_path}")
+                    actual_audio_path = temp_file.name
+                    ext = 'mp3'
+                    
+                    # 检查转换后的文件大小
+                    import os as os_check
+                    converted_size = os_check.path.getsize(actual_audio_path)
+                    logger.info(f"Audio converted: {actual_audio_path}, size={converted_size} bytes")
+                    
+                    if converted_size < 1000:  # 小于 1KB 说明可能有问题
+                        logger.error(f"Converted audio too small: {converted_size} bytes")
+                        return {
+                            "error": f"Audio too short or invalid ({converted_size} bytes)",
+                            "accuracy": 0, "fluency": 0, "completeness": 0, "overall": 0
+                        }
                 except FileNotFoundError:
                     logger.error("ffmpeg not found. Please install ffmpeg.")
                     return {
@@ -118,10 +131,10 @@ class XunfeiPronunciationService:
                         logger.info(f"Xunfei result received")
             
             # 清理临时文件
-            if temp_pcm_file:
+            if temp_file:
                 import os as os_module
                 try:
-                    os_module.unlink(temp_pcm_file.name)
+                    os_module.unlink(temp_file.name)
                 except:
                     pass
             

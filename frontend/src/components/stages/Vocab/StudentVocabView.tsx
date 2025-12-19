@@ -125,9 +125,14 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     setScore(finalScore);
                     setRecordingState('finished');
                     setVocabCardFlipped(true);
-                    // 保存到 store 以同步给教师端
+                    // 保存到 store 以同步给教师端（包含详细分项）
                     useGameStore.setState({
                         vocabRecordingScore: finalScore,
+                        vocabRecordingDetail: {
+                            accuracy: Math.round(result.accuracy),
+                            fluency: Math.round(result.fluency),
+                            completeness: Math.round(result.completeness)
+                        },
                         studentRecordingState: 'finished'
                     });
                 }

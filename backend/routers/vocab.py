@@ -72,12 +72,19 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
             vocab_card = new_card
 
     if vocab_card:
+        # 提取包含单词的句子（如果提供了上下文）
+        example_sentence = vocab_card.context_sentence
+        if request.context_sentence:
+            example_sentence = vocab_service._extract_sentence_with_word(
+                request.context_sentence, word
+            )
+        
         return VocabLookupResponse(
             word=vocab_card.word,
             phonetic=vocab_card.phonetic,
             definition=vocab_card.definition,
             syllables=vocab_card.syllables or [],
-            example=request.context_sentence or vocab_card.context_sentence,
+            example=example_sentence,
             audio_url=vocab_card.audio_url,
             ai_memory_hint=vocab_card.ai_memory_hint,
         )

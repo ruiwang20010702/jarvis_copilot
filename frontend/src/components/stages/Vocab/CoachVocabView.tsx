@@ -81,8 +81,19 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
         remoteStream,
         vocabSpeakEnabled,
         vocabRecordingScore,
+        vocabRecordingDetail,
         studentRecordingState
     } = useGameStore();
+
+    // 音节颜色配置（与学生端一致）
+    const syllableColors = [
+        { text: 'text-rose-600', bg: 'bg-rose-50' },
+        { text: 'text-blue-600', bg: 'bg-blue-50' },
+        { text: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { text: 'text-purple-600', bg: 'bg-purple-50' },
+        { text: 'text-amber-600', bg: 'bg-amber-50' }
+    ];
+
 
     const currentCard = vocabList[currentVocabIndex];
     const currentRemedialWord = remedialQueue[remedialIndex];
@@ -252,56 +263,118 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                 </div>
 
                                 <div className="aspect-[16/10] bg-white rounded-[3rem] shadow-xl border border-slate-200 flex flex-col items-center justify-center relative p-10">
-                                    <h2 className="text-7xl font-serif font-bold text-slate-800">
-                                        {isSyllableMode && currentCard.syllables ? currentCard.syllables.join('·') : currentCard.word}
-                                    </h2>
+                                    {/* 单词/音节显示 - 与学生端一致 */}
+                                    <div className="flex items-center gap-4 mb-4">
+                                        {isSyllableMode && currentCard.syllables ? (
+                                            <div className="flex gap-2">
+                                                {currentCard.syllables.map((syl, i) => {
+                                                    const colorScheme = syllableColors[i % syllableColors.length];
+                                                    return (
+                                                        <motion.span
+                                                            key={i}
+                                                            initial={{ scale: 0 }}
+                                                            animate={{ scale: 1 }}
+                                                            transition={{ delay: i * 0.1 }}
+                                                            className={`text-5xl font-serif font-bold px-3 py-1 rounded-xl ${colorScheme.text} ${colorScheme.bg}`}
+                                                        >
+                                                            {syl}
+                                                        </motion.span>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <h2 className="text-6xl font-serif font-bold text-slate-900">{currentCard.word}</h2>
+                                        )}
+                                    </div>
+
+                                    {/* 翻转后的内容 - 与学生端一致 */}
                                     {vocabCardFlipped && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="mt-8 bg-slate-50 rounded-xl p-4 w-full text-center"
+                                            className="w-full max-w-md"
                                         >
-                                            <p className="text-slate-500">{currentCard.definition}</p>
-                                        </motion.div>
-                                    )}
-                                    {/* 跟读状态显示 */}
-                                    {(studentRecordingState !== 'idle' || vocabRecordingScore !== null) && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="absolute bottom-8 left-1/2 -translate-x-1/2"
-                                        >
-                                            {studentRecordingState === 'recording' ? (
-                                                <div className="flex items-center gap-3 px-6 py-3 bg-red-50 border-2 border-red-200 rounded-full">
-                                                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                                                    <span className="text-red-600 font-bold">录音中...</span>
-                                                    <Mic size={18} className="text-red-500" />
-                                                </div>
-                                            ) : studentRecordingState === 'assessing' ? (
-                                                <div className="flex items-center gap-3 px-6 py-3 bg-amber-50 border-2 border-amber-200 rounded-full">
-                                                    <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
-                                                    <span className="text-amber-600 font-bold">评分中...</span>
-                                                </div>
-                                            ) : vocabRecordingScore !== null && (
-                                                <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${vocabRecordingScore >= 80
-                                                    ? 'bg-emerald-50 border-2 border-emerald-200'
-                                                    : 'bg-amber-50 border-2 border-amber-200'
-                                                    }`}>
-                                                    {vocabRecordingScore >= 80 ? (
-                                                        <>
-                                                            <Sparkles size={18} className="text-emerald-500" />
-                                                            <span className="text-emerald-600 font-bold">发音很棒！{vocabRecordingScore}分</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="text-amber-600 font-bold">{vocabRecordingScore}分 - 再试一次？</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                                                <p className="text-slate-800 text-base font-medium">
+                                                    {currentCard.definition}
+                                                </p>
+                                            </div>
                                         </motion.div>
                                     )}
                                 </div>
+
+                                {/* 评分显示 - 在卡片下方居中 */}
+                                {(studentRecordingState !== 'idle' || vocabRecordingScore !== null) && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mt-6 flex justify-center"
+                                    >
+                                        {studentRecordingState === 'recording' ? (
+                                            <div className="flex items-center gap-3 px-8 py-4 bg-red-50 border-2 border-red-200 rounded-2xl shadow-lg">
+                                                <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
+                                                <span className="text-red-600 font-bold text-lg">正在录音...</span>
+                                                <Mic size={24} className="text-red-500" />
+                                            </div>
+                                        ) : studentRecordingState === 'assessing' ? (
+                                            <div className="flex items-center gap-3 px-8 py-4 bg-amber-50 border-2 border-amber-200 rounded-2xl shadow-lg">
+                                                <div className="w-4 h-4 bg-amber-500 rounded-full animate-pulse" />
+                                                <span className="text-amber-600 font-bold text-lg">正在评分...</span>
+                                            </div>
+                                        ) : vocabRecordingScore !== null && (
+                                            <div className={`px-8 py-5 rounded-2xl shadow-lg ${vocabRecordingScore >= 80
+                                                ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200'
+                                                : vocabRecordingScore >= 60
+                                                    ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200'
+                                                    : 'bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200'
+                                                }`}>
+                                                <div className="flex items-center justify-center gap-6">
+                                                    <Sparkles size={28} className={
+                                                        vocabRecordingScore >= 80 ? 'text-emerald-500' :
+                                                            vocabRecordingScore >= 60 ? 'text-amber-500' : 'text-red-500'
+                                                    } />
+                                                    <div className="text-center">
+                                                        <div className={`text-4xl font-bold ${vocabRecordingScore >= 80 ? 'text-emerald-600' :
+                                                            vocabRecordingScore >= 60 ? 'text-amber-600' : 'text-red-600'
+                                                            }`}>
+                                                            {vocabRecordingScore} 分
+                                                        </div>
+                                                        <div className={`text-sm font-medium ${vocabRecordingScore >= 80 ? 'text-emerald-500' :
+                                                            vocabRecordingScore >= 60 ? 'text-amber-500' : 'text-red-500'
+                                                            }`}>
+                                                            {vocabRecordingScore >= 90 ? '🎉 发音完美！' :
+                                                                vocabRecordingScore >= 80 ? '👏 发音很棒！' :
+                                                                    vocabRecordingScore >= 60 ? '💪 继续加油！' : '🔄 再试一次'}
+                                                        </div>
+                                                    </div>
+                                                    {/* 详细分项 */}
+                                                    {vocabRecordingDetail && (
+                                                        <div className="flex gap-4 ml-4 pl-4 border-l-2 border-slate-200">
+                                                            <div className="text-center">
+                                                                <div className="text-xs text-slate-400 mb-1">准确度</div>
+                                                                <div className={`text-lg font-bold ${vocabRecordingDetail.accuracy >= 80 ? 'text-emerald-600' : vocabRecordingDetail.accuracy >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                                    {vocabRecordingDetail.accuracy}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-xs text-slate-400 mb-1">流利度</div>
+                                                                <div className={`text-lg font-bold ${vocabRecordingDetail.fluency >= 80 ? 'text-emerald-600' : vocabRecordingDetail.fluency >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                                    {vocabRecordingDetail.fluency}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-xs text-slate-400 mb-1">完整度</div>
+                                                                <div className={`text-lg font-bold ${vocabRecordingDetail.completeness >= 80 ? 'text-emerald-600' : vocabRecordingDetail.completeness >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                                    {vocabRecordingDetail.completeness}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
                             </motion.div>
                         ) : phase4Step === 'exitpass' && exitPassStep === 'check' ? (
                             <motion.div
@@ -383,18 +456,45 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
 
                                     {/* 回炉单词卡片 */}
                                     <div className="aspect-[16/10] bg-white rounded-[3rem] shadow-xl border border-orange-100 flex flex-col items-center justify-center relative p-10">
-                                        <h2 className="text-7xl font-serif font-bold text-slate-800">
-                                            {isSyllableMode && currentRemedialCard.syllables ? currentRemedialCard.syllables.join('·') : currentRemedialCard.word}
-                                        </h2>
+                                        {/* 单词/音节显示 - 与学生端一致 */}
+                                        <div className="flex items-center gap-4 mb-4">
+                                            {isSyllableMode && currentRemedialCard.syllables ? (
+                                                <div className="flex gap-2">
+                                                    {currentRemedialCard.syllables.map((syl, i) => {
+                                                        const colorScheme = syllableColors[i % syllableColors.length];
+                                                        return (
+                                                            <motion.span
+                                                                key={i}
+                                                                initial={{ scale: 0 }}
+                                                                animate={{ scale: 1 }}
+                                                                transition={{ delay: i * 0.1 }}
+                                                                className={`text-5xl font-serif font-bold px-3 py-1 rounded-xl ${colorScheme.text} ${colorScheme.bg}`}
+                                                            >
+                                                                {syl}
+                                                            </motion.span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <h2 className="text-6xl font-serif font-bold text-slate-900">{currentRemedialCard.word}</h2>
+                                            )}
+                                        </div>
+
+                                        {/* 翻转后的内容 - 与学生端一致 */}
                                         {vocabCardFlipped && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className="mt-8 bg-slate-50 rounded-xl p-4 w-full text-center"
+                                                className="w-full max-w-md"
                                             >
-                                                <p className="text-slate-500">{currentRemedialCard.definition}</p>
+                                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                                                    <p className="text-slate-800 text-base font-medium">
+                                                        {currentRemedialCard.definition}
+                                                    </p>
+                                                </div>
                                             </motion.div>
                                         )}
+
                                         {/* 跟读状态显示 */}
                                         {(studentRecordingState !== 'idle' || vocabRecordingScore !== null) && (
                                             <motion.div

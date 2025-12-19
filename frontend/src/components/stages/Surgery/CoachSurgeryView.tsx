@@ -4,7 +4,6 @@ import { useGameStore, SentenceChunk, Stage } from '../../../../store';
 import { VideoWindow } from '../../shared/VideoWindow';
 import {
     Eye, GraduationCap, Scissors,
-    Undo2, RotateCcw,
     ChevronLeft, ChevronRight,
     Sparkles, MessageCircle, Send, User,
     Monitor, Split, Volume2, LayoutDashboard
@@ -95,15 +94,17 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         publishCoachingTask,
         coachingTaskCompleted,
         setStage,
-        loadMockSurgeryData
+        loadMockSurgeryData,
+        showSurgeryStructure,
+        setShowSurgeryStructure
     } = useGameStore();
 
     const [coachInput, setCoachInput] = useState("");
     const [operationHistory, setOperationHistory] = useState<string[]>([]);
-    const [showStructure, setShowStructure] = useState(false); // 是否展示句子结构图
-    const [pendingToolCall, setPendingToolCall] = useState<{ name: string; args: any; instruction: string } | null>(null);
+    const [pendingToolCalls, setPendingToolCalls] = useState<Array<{ name: string; args: any; instruction: string }>>([]);
     const [currentTask, setCurrentTask] = useState<{ type: string; instruction: string } | null>(null);
     const [activeJarvisTab, setActiveJarvisTab] = useState<'chat' | 'plan'>('chat');
+    const [autoTriggerMessage, setAutoTriggerMessage] = useState<string | null>(null); // 用于自动触发 AI 继续
     const chatRef = useRef<HTMLDivElement>(null);
     const jarvisChatRef = useRef<HTMLDivElement>(null);
     const prevChunksRef = useRef<SentenceChunk[]>([]);
@@ -132,41 +133,137 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         switch (toolName) {
             case 'publish_voice_task':
                 setCurrentTask({ type: 'voice', instruction: args.instruction || '请用语音回答' });
-                publishCoachingTask('voice');
+                publishCoachingTask('voice', null, args.instruction || '请用语音回答');
                 break;
             case 'publish_highlight_task':
                 setCurrentTask({ type: 'highlight', instruction: args.instruction || '请在句子中标记' });
-                publishCoachingTask('highlight', 'article');
+                publishCoachingTask('highlight', 'article', args.instruction || '请在句子中标记');
                 break;
-            case 'show_sentence_structure':
-                setShowStructure(true);
+            case 'simplify_sentence':
+                // 视觉降维：一次调用，逐个移除所有修饰语（带动画延迟）
+                const modifiers = surgeryChunks.filter(c => c.type === 'modifier' && !c.isRemoved);
+                modifiers.forEach((chunk, index) => {
+                    setTimeout(() => {
+                        removeChunk(chunk.id);
+                    }, index * 400); // 每个修饰语间隔 400ms
+                });
+                // 所有修饰语移除后触发 AI 继续
+                setTimeout(() => {
+                    setAutoTriggerMessage('（所有修饰语已移除，请继续）');
+                }, modifiers.length * 400 + 200);
                 break;
-            case 'complete_surgery':
-                if (currentSurgeryIndex < surgeryList.length - 1) {
-                    setCurrentSurgeryIndex(currentSurgeryIndex + 1);
-                    setShowStructure(false);
-                    setCurrentTask(null);
+
+            case 'remove_modifier':
+                // 逐步淡出：移除指定的修饰语
+                const targetText = args.chunk_text?.trim();
+                if (targetText) {
+                    const targetChunk = surgeryChunks.find(
+                        c => c.type === 'modifier' && !c.isRemoved && c.text.trim() === targetText
+                    );
+                    if (targetChunk) {
+                        removeChunk(targetChunk.id);
+                        // 自动触发 AI 继续（可能继续移除或发布下一个任务）
+                        setAutoTriggerMessage(`（已移除修饰语"${targetText}"，请继续）`);
+                    } else {
+                        console.warn('[CoachSurgeryView] Modifier not found:', targetText);
+                    }
                 }
                 break;
+
+            case 'restore_sentence':
+                // 复原句子
+                restoreSentence();
+                // 自动触发 AI 继续
+                setAutoTriggerMessage('（句子已复原，请继续）');
+                break;
+
+            case 'publish_pronunciation_task':
+                // 发布跟读任务
+                setCurrentTask({ type: 'pronunciation', instruction: `请跟读：${args.text}` });
+                publishCoachingTask('voice', null, `请跟读：${args.text}`); // 借用语音任务通道
+                break;
+            case 'show_sentence_structure':
+                setShowSurgeryStructure(true);
+                // 设置标志，触发 AI 继续回复（发布任务让学生找主语）
+                setAutoTriggerMessage('（结构标签已展示，请继续）');
+                break;
+
+            case 'publish_student_surgery_task':
+                // 学生实操任务：复原句子 + 切换到学生模式
+                restoreSentence();
+                setSurgeryMode('student');
+                setCurrentTask({ type: 'student_surgery', instruction: args.instruction || '请删除修饰语，保留主干句' });
+                publishCoachingTask('voice', null, args.instruction || '请删除修饰语，保留主干句');
+                break;
+
+            case 'complete_surgery':
+
+                if (currentSurgeryIndex < surgeryList.length - 1) {
+                    setCurrentSurgeryIndex(currentSurgeryIndex + 1);
+                    setShowSurgeryStructure(false);
+                    setCurrentTask(null);
+                } else {
+                    // 最后一题完成，进入下一阶段
+                    console.log('[CoachSurgeryView] All surgeries completed, moving to skill stage');
+                    setStage('skill');
+                }
+
+
+                break;
         }
-        setPendingToolCall(null);
-    }, [currentSurgeryIndex, surgeryList.length, setCurrentSurgeryIndex, publishCoachingTask]);
+        // 从队列中移除已执行的工具
+        setPendingToolCalls(prev => prev.slice(1));
+    }, [
+        currentSurgeryIndex,
+        surgeryList.length,
+        setCurrentSurgeryIndex,
+        publishCoachingTask,
+        surgeryChunks,
+        removeChunk,
+        restoreSentence,
+        setSurgeryMode,
+        setShowSurgeryStructure
+    ]);
+
 
     // 工具调用回调处理（拦截需要确认的任务）
     const handleToolCall = useCallback((toolName: string, args: Record<string, any>) => {
         console.log('[CoachSurgeryView] Tool call received:', toolName, args);
 
         // 需要确认的任务类型（教师需要点击"确认发布"才会发送给学生）
-        const confirmableTools = ['publish_voice_task', 'publish_highlight_task', 'complete_surgery'];
+        const confirmableTools = [
+            'publish_voice_task',
+            'publish_highlight_task',
+            'complete_surgery',
+            'simplify_sentence',
+            'remove_modifier',
+            'restore_sentence',
+            'publish_pronunciation_task',
+            'show_sentence_structure',
+            'publish_student_surgery_task'
+        ];
 
         if (confirmableTools.includes(toolName)) {
             let instruction = args.instruction;
             if (!instruction) {
                 if (toolName === 'publish_voice_task') instruction = '请用语音回答';
                 if (toolName === 'publish_highlight_task') instruction = '请在句子中标记';
-                if (toolName === 'complete_surgery') instruction = `完成当前句子讲解，进入下一句 (${args.summary || '讲解完成'})`;
+                if (toolName === 'complete_surgery') {
+                    const isLast = currentSurgeryIndex >= surgeryList.length - 1;
+                    instruction = isLast
+                        ? `完成所有句子讲解 (${args.summary || '全部完成'})`
+                        : `完成当前句子讲解，进入下一句 (${args.summary || '讲解完成'})`;
+                }
+                if (toolName === 'simplify_sentence') instruction = '一键移除所有修饰语';
+
+                if (toolName === 'remove_modifier') instruction = `移除修饰语："${args.chunk_text}"`;
+                if (toolName === 'restore_sentence') instruction = '复原完整句子';
+                if (toolName === 'publish_pronunciation_task') instruction = `引导学生跟读：${args.text}`;
+                if (toolName === 'show_sentence_structure') instruction = '展示句子结构标签';
+                if (toolName === 'publish_student_surgery_task') instruction = `学生实操：${args.instruction || '请删除修饰语，保留主干句'}`;
             }
-            setPendingToolCall({ name: toolName, args, instruction });
+            // 添加到队列，而不是覆盖
+            setPendingToolCalls(prev => [...prev, { name: toolName, args, instruction }]);
         } else {
             // 其他工具直接执行
             executeToolCall(toolName, args);
@@ -182,8 +279,17 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         isThinking: isJarvisThinking
     } = useStreamingChat({
         context: chatContext,
-        onToolCall: handleToolCall
+        onToolCall: handleToolCall,
+        onNoToolCall: () => {
+            // AI 没有调用工具，自动发送提醒让 AI 重试
+            console.log('[CoachSurgeryView] AI did not call any tool, sending reminder...');
+            setTimeout(() => {
+                setAutoTriggerMessage('（请调用工具继续教学）');
+            }, 500);
+        }
     });
+
+
 
     // 初始化 Jarvis 会话
     useEffect(() => {
@@ -201,6 +307,14 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         }
     }, [aiMessages, isJarvisThinking]);
 
+    // 监听 autoTriggerMessage，自动向 AI 发送消息触发下一步
+    useEffect(() => {
+        if (autoTriggerMessage && !isJarvisLoading) {
+            sendJarvisMessage(autoTriggerMessage);
+            setAutoTriggerMessage(null);
+        }
+    }, [autoTriggerMessage, isJarvisLoading, sendJarvisMessage]);
+
     // 监听学生完成任务 - 将学生回复发送给 Jarvis
     useEffect(() => {
         if (coachingTaskCompleted && currentTask) {
@@ -210,9 +324,19 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 // 从 store 消息中获取学生回复
                 const lastStudentMsg = messages.filter(m => m.role === 'student').slice(-1)[0];
                 userMessage = lastStudentMsg?.text || '（学生已完成语音回答）';
+            } else if (currentTask.type === 'pronunciation') {
+                // 跟读任务完成
+                userMessage = '（学生已完成跟读）';
+            } else if (currentTask.type === 'student_surgery') {
+                // 学生实操任务完成：把学生保留的块发送给 Jarvis 判断
+                const remainingChunks = surgeryChunks.filter(c => !c.isRemoved).map(c => c.text).join(' ');
+                userMessage = `学生提交的主干句：${remainingChunks}`;
+                // 切回教师模式
+                setSurgeryMode('teacher');
             } else if (currentTask.type === 'highlight') {
                 userMessage = '（学生已完成标记）';
             }
+
 
             if (userMessage) {
                 console.log('[CoachSurgeryView] Sending student response to Jarvis:', userMessage);
@@ -220,7 +344,9 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 setCurrentTask(null);
             }
         }
-    }, [coachingTaskCompleted, currentTask, messages, sendJarvisMessage]);
+    }, [coachingTaskCompleted, currentTask, messages, sendJarvisMessage, surgeryChunks, setSurgeryMode]);
+
+
 
     // 教师只能在 'teacher' 模式下点击句子
     const isTeacherInteractive = surgeryMode === 'teacher';
@@ -292,19 +418,6 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         removeChunk(chunk.id);
     };
 
-    // 撤回上一步操作
-    const handleUndo = () => {
-        if (operationHistory.length === 0) return;
-
-        // 从历史栈中取出最后一个删除的chunk ID
-        const lastRemovedId = operationHistory[operationHistory.length - 1];
-
-        // 恢复这个chunk
-        restoreChunk(lastRemovedId);
-
-        // 从历史栈中移除
-        setOperationHistory(prev => prev.slice(0, -1));
-    };
 
     // 发送消息
     const handleSendCoachMsg = () => {
@@ -386,18 +499,30 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ y: -30, opacity: 0, scale: 0.7, transition: { duration: 0.3 } }}
                                                 onClick={() => handleChunkClick(c)}
-                                                className={`text-4xl md:text-5xl font-serif font-bold px-4 py-2 rounded-2xl transition-all ${c.type === 'modifier' && isTeacherInteractive
+                                                className={`relative text-4xl md:text-5xl font-serif font-bold px-4 py-2 rounded-2xl transition-all ${c.type === 'modifier' && isTeacherInteractive
                                                     ? 'cursor-pointer hover:bg-blue-50 hover:shadow-md active:scale-95'
                                                     : ''
-                                                    } ${showStructure
+                                                    } ${showSurgeryStructure
                                                         ? (c.type === 'core'
                                                             ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-400'
                                                             : 'bg-amber-100 text-amber-800 border-2 border-amber-400')
                                                         : 'text-[#1E293B]'
                                                     }`}
                                             >
+                                                {/* 成分标签浮动显示 */}
+                                                {showSurgeryStructure && (
+                                                    <div
+                                                        className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${c.type === 'core'
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : 'bg-amber-500 text-white'
+                                                            }`}
+                                                    >
+                                                        {c.label || (c.type === 'core' ? '核心' : '修饰语')}
+                                                    </div>
+                                                )}
                                                 {c.text}
                                             </motion.div>
+
                                         ))}
                                     </AnimatePresence>
                                 </motion.div>
@@ -414,210 +539,106 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
             </div>
 
             {/* ====== 右侧 30%：功能侧边栏 ====== */}
-            <div className="flex-[3] bg-white border-l border-slate-200 flex flex-col min-w-[360px] shadow-[-10px_0_30px_rgba(0,0,0,0.02)]">
+            <div className="w-full md:w-[450px] lg:w-[500px] flex flex-col bg-white h-full relative border-l border-slate-100 p-6">
                 {/* 1. 视频面板 */}
-                <div className="p-6 shrink-0">
-                    <div className="aspect-video bg-[#0F172A] rounded-2xl relative overflow-hidden shadow-inner group">
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                                <User size={32} className="text-white/20" />
+                <VideoWindow
+                    layoutId="coach-video"
+                    className="relative w-full shrink-0 mb-6 rounded-xl shadow-md"
+                    placeholderText="学生视频连线中..."
+                    videoStream={remoteStream}
+                />
+
+
+
+
+                {/* 3. Jarvis 助教面板 */}
+                <div className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-[#00B4EE] flex items-center justify-center text-white shadow-sm shadow-blue-100">
+                                <Sparkles size={12} fill="currentColor" />
                             </div>
-                            <span className="text-white/40 text-xs font-medium tracking-widest uppercase">学生视频连线中...</span>
+                            <span className="text-sm font-bold text-slate-700">Jarvis 助教</span>
                         </div>
-
-                        {/* 视频顶部标签 */}
-                        <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            <span className="text-[10px] font-bold text-white uppercase tracking-tighter">在线</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setActiveJarvisTab('chat')}
+                                className={`text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-md transition-colors ${activeJarvisTab === 'chat' ? 'bg-blue-50 text-[#00B4EE]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                实时对话
+                            </button>
+                            <button
+                                onClick={() => setActiveJarvisTab('plan')}
+                                className={`text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-md transition-colors ${activeJarvisTab === 'plan' ? 'bg-blue-50 text-[#00B4EE]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                教学计划
+                            </button>
                         </div>
-
-                        {/* 视频底部控制 */}
-                        <div className="absolute bottom-3 right-3 p-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Volume2 size={14} className="text-white/80" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. 单词卡片控制面板 */}
-                <div className="px-6 py-4 flex flex-col min-h-0 border-b border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">单词卡片控制</h3>
                     </div>
 
-                    {/* 模式切换大按钮 */}
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                        <button
-                            onClick={() => setSurgeryMode('observation')}
-                            className={`flex flex-col items-center gap-1 py-2 rounded-xl border transition-all ${surgeryMode === 'observation'
-                                ? 'shadow-md shadow-slate-200'
-                                : 'shadow-sm hover:shadow-md'
-                                }`}
-                            style={surgeryMode === 'observation' ? {
-                                backgroundColor: '#9CA3AF',
-                                color: 'white',
-                                borderColor: '#9CA3AF'
-                            } : {
-                                backgroundColor: '#F3F4F6',
-                                color: '#6B7280',
-                                borderColor: '#F3F4F6'
-                            }}
-                        >
-                            <Eye size={16} />
-                            <span className="text-[10px] font-bold">观察</span>
-                        </button>
-                        <button
-                            onClick={() => setSurgeryMode('teacher')}
-                            className={`flex flex-col items-center gap-1 py-2 rounded-xl border transition-all ${surgeryMode === 'teacher'
-                                ? 'shadow-md shadow-blue-100'
-                                : 'shadow-sm hover:shadow-md'
-                                }`}
-                            style={surgeryMode === 'teacher' ? {
-                                backgroundColor: '#00B4EE',
-                                color: 'white',
-                                borderColor: '#00B4EE'
-                            } : {
-                                backgroundColor: 'rgba(0, 180, 238, 0.1)',
-                                color: '#00B4EE',
-                                border: '1px solid rgba(0, 180, 238, 0.2)'
-                            }}
-                        >
-                            <GraduationCap size={16} />
-                            <span className="text-[10px] font-bold">教师</span>
-                        </button>
-                        <button
-                            onClick={() => setSurgeryMode('student')}
-                            className={`flex flex-col items-center gap-1 py-2 rounded-xl border transition-all ${surgeryMode === 'student'
-                                ? 'shadow-md shadow-yellow-100'
-                                : 'shadow-sm hover:shadow-md'
-                                }`}
-                            style={surgeryMode === 'student' ? {
-                                backgroundColor: '#FDE700',
-                                color: '#57585A',
-                                borderColor: '#FDE700'
-                            } : {
-                                backgroundColor: 'rgba(253, 231, 0, 0.1)',
-                                color: '#B39B00',
-                                border: '1px solid rgba(253, 231, 0, 0.3)'
-                            }}
-                        >
-                            <Scissors size={16} />
-                            <span className="text-[10px] font-bold">学生</span>
-                        </button>
-                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4" ref={jarvisChatRef}>
+                        {activeJarvisTab === 'chat' ? (
+                            <div className="space-y-4">
+                                {aiMessages.length === 0 && !isJarvisThinking && (
+                                    <div className="text-center py-8">
+                                        <p className="text-xs text-slate-400 font-medium">等待教学开始...</p>
+                                    </div>
+                                )}
+                                {aiMessages.map((msg, idx) => (
+                                    <StreamingMessageBubble
+                                        key={idx}
+                                        message={msg}
+                                        isLast={idx === aiMessages.length - 1}
+                                    />
+                                ))}
+                                {isJarvisThinking && (
+                                    <div className="flex gap-2 items-center text-slate-400 p-2">
+                                        <div className="flex gap-1">
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }} className="w-1 h-1 rounded-full bg-current" />
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} className="w-1 h-1 rounded-full bg-current" />
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} className="w-1 h-1 rounded-full bg-current" />
+                                        </div>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Jarvis 思考中</span>
+                                    </div>
+                                )}
 
-                    {/* 功能小按钮 */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <button
-                            onClick={restoreSentence}
-                            className="flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-100 text-slate-500 text-[10px] font-bold hover:bg-slate-50 transition-colors"
-                        >
-                            <RotateCcw size={14} />
-                            <span>重置</span>
-                        </button>
-                        <button
-                            onClick={handleUndo}
-                            disabled={operationHistory.length === 0}
-                            className="flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-100 text-slate-500 text-[10px] font-bold hover:bg-slate-50 transition-colors disabled:opacity-30"
-                        >
-                            <Undo2 size={14} />
-                            <span>撤回</span>
-                        </button>
-                    </div>
-
-
-                    {/* 3. Jarvis 助教面板 */}
-                    <div
-                        className="flex-1 flex flex-col min-h-0"
-                    >
-                        <div className="px-6 py-4 border-b border-slate-50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#00B4EE] flex items-center justify-center text-white shadow-md shadow-blue-100">
-                                    <Sparkles size={16} fill="currentColor" />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="text-sm font-black text-slate-800">Jarvis 助教</h4>
-                                    <div className="flex gap-4 mt-1">
+                                {pendingToolCalls.length > 0 && (
+                                    <div className="mt-4 p-3 bg-blue-50/50 rounded-xl border border-blue-100 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Sparkles size={12} className="text-blue-500" />
+                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">待发布任务 ({pendingToolCalls.length})</span>
+                                        </div>
+                                        <p className="text-xs text-blue-800 font-bold mb-3 leading-relaxed">
+                                            {pendingToolCalls[0].instruction}
+                                        </p>
                                         <button
-                                            onClick={() => setActiveJarvisTab('chat')}
-                                            className={`text-[10px] font-black uppercase tracking-tighter transition-colors ${activeJarvisTab === 'chat' ? 'text-[#00B4EE]' : 'text-slate-400 hover:text-slate-600'}`}
+                                            onClick={() => executeToolCall(pendingToolCalls[0].name, pendingToolCalls[0].args)}
+                                            className="w-full py-2 bg-blue-500 text-white text-[10px] font-black rounded-lg hover:bg-blue-600 transition-colors shadow-md shadow-blue-100"
                                         >
-                                            实时对话
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveJarvisTab('plan')}
-                                            className={`text-[10px] font-black uppercase tracking-tighter transition-colors ${activeJarvisTab === 'plan' ? 'text-[#00B4EE]' : 'text-slate-400 hover:text-slate-600'}`}
-                                        >
-                                            教学计划
+                                            确认发布给学生
                                         </button>
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-4" ref={jarvisChatRef}>
-                            {activeJarvisTab === 'chat' ? (
-                                <div className="space-y-4">
-                                    {aiMessages.length === 0 && !isJarvisThinking && (
-                                        <div className="text-center py-8">
-                                            <p className="text-xs text-slate-400 font-medium">等待教学开始...</p>
+                        ) : (
+                            <div className="space-y-3 py-2">
+                                {TEACHING_STEPS.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3 items-start group">
+                                        <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-50 transition-colors">
+                                            <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-500">{idx + 1}</span>
                                         </div>
-                                    )}
-                                    {aiMessages.map((msg, idx) => (
-                                        <StreamingMessageBubble
-                                            key={idx}
-                                            message={msg}
-                                            isLast={idx === aiMessages.length - 1}
-                                        />
-                                    ))}
-                                    {isJarvisThinking && (
-                                        <div className="flex gap-2 items-center text-slate-400 p-2">
-                                            <div className="flex gap-1">
-                                                <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }} className="w-1 h-1 rounded-full bg-current" />
-                                                <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} className="w-1 h-1 rounded-full bg-current" />
-                                                <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} className="w-1 h-1 rounded-full bg-current" />
-                                            </div>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest">Jarvis 思考中</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-3 py-2">
-                                    {TEACHING_STEPS.map((step, idx) => (
-                                        <div key={idx} className="flex gap-3 items-start group">
-                                            <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-50 transition-colors">
-                                                <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-500">{idx + 1}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 font-medium leading-relaxed group-hover:text-slate-900 transition-colors">
-                                                {step}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {activeJarvisTab === 'chat' && pendingToolCall && (
-                            <div className="px-6 py-4 border-t border-blue-50 bg-blue-50/30">
-                                <div className="p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Sparkles size={12} className="text-blue-500" />
-                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">待发布任务</span>
+                                        <p className="text-xs text-slate-600 font-medium leading-relaxed group-hover:text-slate-900 transition-colors">
+                                            {step}
+                                        </p>
                                     </div>
-                                    <p className="text-xs text-blue-800 font-bold mb-3 leading-relaxed">
-                                        {pendingToolCall.instruction}
-                                    </p>
-                                    <button
-                                        onClick={() => executeToolCall(pendingToolCall.name, pendingToolCall.args)}
-                                        className="w-full py-2 bg-blue-500 text-white text-[10px] font-black rounded-lg hover:bg-blue-600 transition-colors shadow-md shadow-blue-100"
-                                    >
-                                        确认发布给学生
-                                    </button>
-                                </div>
+                                ))}
                             </div>
                         )}
                     </div>
+
                 </div>
             </div>
         </main>
     );
 };
+

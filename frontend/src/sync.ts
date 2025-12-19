@@ -46,6 +46,7 @@ const SYNC_KEYS = [
     'coachingTaskTarget',
     'coachingTaskReceived',
     'coachingTaskCompleted',
+    'coachingTaskInstruction',
     'teacherHighlights',
     'studentHighlights',
     'gpsCardReceived',
@@ -65,10 +66,12 @@ const SYNC_KEYS = [
     'isPlayingAudio',
     'vocabSpeakEnabled',
     'vocabRecordingScore',
+    'vocabRecordingDetail',
     'studentRecordingState',
     // Surgery Phase 5 State
     'surgeryMode',
     'surgeryChunks',
+    'showSurgeryStructure',
     // Review Stage
     'reviewReportGenerated',
     // Skill Stage (Phase 2)

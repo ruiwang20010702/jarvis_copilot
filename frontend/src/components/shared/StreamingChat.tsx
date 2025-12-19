@@ -89,6 +89,7 @@ interface StreamingMessage {
 interface UseStreamingChatOptions {
     context: ChatContext;
     onToolCall?: (toolName: string, args: Record<string, any>) => void;
+    onNoToolCall?: () => void; // AI 回复完成但没有调用工具时触发
     onError?: (error: string) => void;
 }
 
@@ -109,7 +110,8 @@ interface UseStreamingChatReturn {
  * 管理流式对话状态，处理 SSE 事件
  */
 export function useStreamingChat(options: UseStreamingChatOptions): UseStreamingChatReturn {
-    const { context, onToolCall, onError } = options;
+    const { context, onToolCall, onNoToolCall, onError } = options;
+
 
     const [messages, setMessages] = useState<StreamingMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -276,6 +278,9 @@ export function useStreamingChat(options: UseStreamingChatOptions): UseStreaming
                                 onToolCall?.(tc.name, tc.arguments);
                             });
                         }, 300);
+                    } else {
+                        // AI 没有调用工具，触发回调
+                        onNoToolCall?.();
                     }
                 } else if (event.type === 'error') {
                     onError?.(event.content as string);

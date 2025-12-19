@@ -25,8 +25,10 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
         hasSurgeryData,
         coachingTaskType,
         coachingTaskReceived,
+        coachingTaskInstruction,
         receiveCoachingTask,
-        completeCoachingTask
+        completeCoachingTask,
+        showSurgeryStructure
     } = useGameStore();
 
     const chatEndRef = useRef<HTMLDivElement>(null);
@@ -155,7 +157,7 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                 </div>
                             </div>
                             <div className="text-sm text-slate-600 mb-4 p-3 bg-slate-50 rounded-lg">
-                                {coachingTaskType === 'voice' ? '请用语音告诉老师你的理解' : '请在句子中标记'}
+                                {coachingTaskInstruction || (coachingTaskType === 'voice' ? '请用语音告诉老师你的理解' : '请在句子中标记')}
                             </div>
                             <button
                                 onClick={handleReceiveTask}
@@ -277,10 +279,26 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                         : 'cursor-default pointer-events-none'
                                                     }
                                                     ${isInteractive && chunk.type === 'modifier' ? 'hover:bg-white/60 hover:shadow-lg' : ''}
-                                                    ${chunk.type === 'core' ? 'text-slate-900' : 'text-slate-700'}
+                                                    ${showSurgeryStructure
+                                                        ? (chunk.type === 'core'
+                                                            ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-400'
+                                                            : 'bg-amber-100 text-amber-800 border-2 border-amber-400')
+                                                        : (chunk.type === 'core' ? 'text-slate-900' : 'text-slate-700')
+                                                    }
                                                     ${chunk.shake ? '!text-red-500' : ''}
                                                 `}
                                             >
+                                                {/* 成分标签浮动显示 */}
+                                                {showSurgeryStructure && (
+                                                    <div
+                                                        className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${chunk.type === 'core'
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : 'bg-amber-500 text-white'
+                                                            }`}
+                                                    >
+                                                        {chunk.label || (chunk.type === 'core' ? '核心' : '修饰语')}
+                                                    </div>
+                                                )}
                                                 {chunk.text}
 
                                                 {/* 学生模式下的提示指示器 */}

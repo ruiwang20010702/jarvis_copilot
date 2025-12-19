@@ -56,6 +56,9 @@ export interface ApiSentenceSurgery {
     original_sentence: string;
     translation: string;
     analysis: string;
+    structure_data: {
+        components?: { text: string; label: string }[];
+    } | null;
     chunks_visual: {
         core: string[];
         modifier: string[];
@@ -64,6 +67,7 @@ export interface ApiSentenceSurgery {
     core_audio_url: string | null;
     coach_script: Record<string, string> | null;
 }
+
 
 export interface ApiVocabCard {
     id: number;
