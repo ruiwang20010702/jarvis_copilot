@@ -125,8 +125,8 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                             animate={step.active && !step.done ? { scale: [1, 1.1, 1] } : {}}
                             transition={{ repeat: Infinity, duration: 1.5 }}
                             className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step.done ? 'bg-emerald-500 text-white' :
-                                    step.active ? 'bg-blue-500 text-white' :
-                                        'bg-gray-200 text-gray-400'
+                                step.active ? 'bg-blue-500 text-white' :
+                                    'bg-gray-200 text-gray-400'
                                 }`}>
                             {step.done ? <Check size={20} /> : step.num}
                         </motion.div>
@@ -158,7 +158,7 @@ const InteractiveDemo: React.FC<{ demoTeacherStep: number; onStepComplete: (step
                     animate={demoTeacherStep >= 1 && !highlighted1969 ? { scale: [1, 1.05, 1] } : {}}
                     transition={{ repeat: Infinity, duration: 0.8 }}
                     className={`relative cursor-pointer transition-all px-1 py-0.5 rounded ${highlighted1969 ? 'bg-yellow-300 font-semibold' :
-                            demoTeacherStep >= 1 ? 'hover:bg-yellow-100 ring-2 ring-blue-400 ring-offset-2' : ''
+                        demoTeacherStep >= 1 ? 'hover:bg-yellow-100 ring-2 ring-blue-400 ring-offset-2' : ''
                         }`}
                 >
                     {/* 跳动的手指图标 */}
@@ -258,7 +258,7 @@ const ClickableWord: React.FC<{
         <span
             onClick={disabled ? undefined : onClick}
             className={`cursor-pointer px-0.5 rounded transition-all ${isHighlighted ? 'bg-yellow-300 font-semibold' :
-                    disabled ? '' : 'hover:bg-yellow-100'
+                disabled ? '' : 'hover:bg-yellow-100'
                 }`}
         >
             {word}
@@ -412,10 +412,11 @@ export const StudentSkillView: React.FC = () => {
             }}
         >
 
-            {/* 视频窗口 - 支持跨阶段平滑动画 */}
+            {/* 视频窗口 - 使用内联style强制右上角定位 */}
             <VideoWindow
                 layoutId="student-video"
-                className="absolute top-6 right-6 w-64 z-[60] rounded-xl shadow-2xl"
+                className="absolute w-64 z-[60] rounded-xl shadow-2xl"
+                style={{ top: '1.5rem', right: '1.5rem', left: 'auto' }}
                 placeholderText="老师视频连线中..."
                 videoStream={remoteStream}
             />
@@ -544,8 +545,8 @@ export const StudentSkillView: React.FC = () => {
                                 <div className="flex gap-2">
                                     {[0, 1, 2, 3, 4].map((i) => (
                                         <div key={i} className={`w-8 h-1.5 rounded-full ${i < currentQuizIndex ? 'bg-emerald-500' :
-                                                i === currentQuizIndex ? 'bg-blue-500' :
-                                                    'bg-gray-200'
+                                            i === currentQuizIndex ? 'bg-blue-500' :
+                                                'bg-gray-200'
                                             }`} />
                                     ))}
                                 </div>
@@ -603,16 +604,16 @@ export const StudentSkillView: React.FC = () => {
                                                 animate={isWrong ? { x: [-10, 10, -10, 10, 0] } : {}}
                                                 transition={{ duration: 0.4 }}
                                                 className={`p-4 rounded-xl border-2 text-left transition-all ${showCorrect ? 'border-emerald-500 bg-emerald-50' :
-                                                        showWrongSelected || isWrong ? 'border-red-500 bg-red-50' :
-                                                            isSelected ? 'border-blue-500 bg-blue-50' :
-                                                                'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                                                    showWrongSelected || isWrong ? 'border-red-500 bg-red-50' :
+                                                        isSelected ? 'border-blue-500 bg-blue-50' :
+                                                            'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${showCorrect ? 'bg-emerald-500 text-white' :
-                                                            showWrongSelected || isWrong ? 'bg-red-500 text-white' :
-                                                                isSelected ? 'bg-blue-500 text-white' :
-                                                                    'bg-gray-100 text-gray-600'
+                                                        showWrongSelected || isWrong ? 'bg-red-500 text-white' :
+                                                            isSelected ? 'bg-blue-500 text-white' :
+                                                                'bg-gray-100 text-gray-600'
                                                         }`}>
                                                         {showCorrect ? <Check size={16} /> :
                                                             showWrongSelected || isWrong ? <X size={16} /> :

@@ -216,10 +216,11 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     )}
                 </AnimatePresence>
 
-                {/* 视频窗口 - 支持跨阶段平滑动画 */}
+                {/* 视频窗口 - 使用内联style强制右上角定位 */}
                 <VideoWindow
                     layoutId="student-video"
-                    className="absolute top-6 right-6 w-64 z-[60] rounded-xl shadow-2xl"
+                    className="absolute w-64 z-[60] rounded-xl shadow-2xl"
+                    style={{ top: '1.5rem', right: '1.5rem', left: 'auto' }}
                     placeholderText="老师连线中..."
                     videoStream={remoteStream}
                 />

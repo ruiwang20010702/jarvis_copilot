@@ -38,6 +38,16 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
     // 严格模式：只有在 'student' 模式下学生才能交互
     const isInteractive = surgeryMode === 'student';
 
+    // 根据句子总长度动态计算字体大小
+    const dynamicFontSize = useMemo(() => {
+        const totalLength = surgeryChunks.filter(c => !c.isRemoved).reduce((acc, c) => acc + c.text.length, 0);
+        // 短句子用大字体，长句子自动缩小
+        if (totalLength <= 30) return 'text-3xl md:text-4xl lg:text-5xl';
+        if (totalLength <= 60) return 'text-2xl md:text-3xl lg:text-4xl';
+        if (totalLength <= 100) return 'text-xl md:text-2xl lg:text-3xl';
+        return 'text-lg md:text-xl lg:text-2xl';
+    }, [surgeryChunks]);
+
     // 监听新任务
     useEffect(() => {
         if (coachingTaskType && !coachingTaskReceived) {
@@ -261,7 +271,7 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                 onClick={() => handleChunkClick(chunk)}
                                                 className={`
                                                     relative px-3 py-2 rounded-xl transition-all duration-200
-                                                    text-4xl md:text-5xl lg:text-6xl font-serif font-bold tracking-tight
+                                                    ${dynamicFontSize} font-serif font-bold tracking-tight
                                                     ${isInteractive
                                                         ? 'cursor-pointer pointer-events-auto'
                                                         : 'cursor-default pointer-events-none'

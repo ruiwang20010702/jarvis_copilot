@@ -78,10 +78,11 @@ export const VideoWindow: React.FC<VideoWindowProps> = ({
     }, [videoStream]);
 
 
+
     return (
         <motion.div
             layoutId={disableLayoutAnimation ? undefined : layoutId}
-            className={`overflow-hidden relative bg-slate-900 ${className}`}
+            className={`overflow-hidden bg-slate-900 ${className.includes('absolute') ? '' : 'relative'} ${className}`}
             style={{
                 aspectRatio: '16/9',
                 ...style

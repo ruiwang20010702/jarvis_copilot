@@ -411,20 +411,6 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     <span className="text-slate-400 font-medium tracking-wide">观察学生操作</span>
                 </div>
 
-                {/* 左下角控制按钮组 */}
-                <div className="absolute bottom-6 left-6 flex items-center gap-2 bg-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-xl">
-                    <button className="p-2 text-white/50 hover:text-white transition-colors">
-                        <User size={18} />
-                    </button>
-                    <div className="w-px h-4 bg-white/10" />
-                    <button className="p-2 bg-white/20 text-white rounded-xl shadow-inner">
-                        <Monitor size={18} />
-                    </button>
-                    <div className="w-px h-4 bg-white/10" />
-                    <button className="p-2 text-white/50 hover:text-white transition-colors">
-                        <Split size={18} />
-                    </button>
-                </div>
             </div>
 
             {/* ====== 右侧 30%：功能侧边栏 ====== */}

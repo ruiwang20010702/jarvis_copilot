@@ -128,10 +128,42 @@ SURGERY_TOOLS = [
                 },
                 "target": {
                     "type": "string",
-                    "description": "画线目标区域: article (文章) 或 question (题干)"
+                    "description": "画线目标区域: article (文章), question (题干) 或 sentence (当前句子)"
                 }
             },
             "required": ["instruction", "target"]
+        }
+    },
+    {
+        "name": "publish_pronunciation_task",
+        "description": "发布跟读任务，让学生朗读指定的文本（如主干句），并进行发音评估。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "要求学生朗读的文本内容"
+                }
+            },
+            "required": ["text"]
+        }
+    },
+    {
+        "name": "simplify_sentence",
+        "description": "执行视觉降维，淡出句子中的修饰语，只保留核心主干。",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "restore_sentence",
+        "description": "复原完整句子，显示所有之前淡出的修饰语。",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
         }
     },
     {
