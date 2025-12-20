@@ -59,6 +59,11 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         setCardKey(prev => prev + 1);
     }, [currentVocabIndex, remedialIndex, exitPassStep]);
 
+    // 调试：监控跟读权限变化
+    useEffect(() => {
+        console.log('[StudentVocab] 🎤 vocabSpeakEnabled changed to:', vocabSpeakEnabled);
+    }, [vocabSpeakEnabled]);
+
     useEffect(() => {
         if (isPlayingAudio === 'standard' && currentCard) {
             setRecordingState('playing_standard');

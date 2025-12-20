@@ -89,32 +89,44 @@ async def lookup_word(request: VocabLookupRequest, db: AsyncSession = Depends(ge
             ai_memory_hint=vocab_card.ai_memory_hint,
         )
     
-    # 数据库完全没有，使用 VocabService 生成
-    vocab_data = await vocab_service.generate_vocab_data(
+    # 数据库完全没有，使用快速查词先返回基础数据
+    import asyncio
+    
+    vocab_data = await vocab_service.generate_quick_vocab(
         word=word,
         context_sentence=request.context_sentence
     )
     
-    # 保存到数据库
+    # 保存基础数据到数据库
     new_card = VocabCard(
-        version_id=request.version_id,  # 关联到版本
+        version_id=request.version_id,
         word=word,
         phonetic=vocab_data.get("phonetic"),
         definition=vocab_data.get("definition"),
-        syllables=vocab_data.get("syllables", []),
+        syllables=vocab_data.get("syllables", [word]),  # 默认不拆分
         context_sentence=vocab_data.get("example"),
-        ai_memory_hint=vocab_data.get("ai_memory_hint"),
-        audio_url=vocab_data.get("audio_url"),
+        ai_memory_hint=None,  # 后台生成
+        audio_url=None,  # 后台生成
     )
     db.add(new_card)
     await db.commit()
+    await db.refresh(new_card)
+    
+    # 启动后台任务完善数据（音节、助记、TTS）
+    asyncio.create_task(
+        vocab_service.complete_vocab_data(
+            word=word,
+            context_sentence=request.context_sentence,
+            vocab_card_id=new_card.id
+        )
+    )
     
     return VocabLookupResponse(
         word=word,
         phonetic=vocab_data.get("phonetic"),
         definition=vocab_data.get("definition"),
-        syllables=vocab_data.get("syllables", []),
+        syllables=vocab_data.get("syllables", [word]),
         example=vocab_data.get("example"),
-        audio_url=vocab_data.get("audio_url"),
-        ai_memory_hint=vocab_data.get("ai_memory_hint"),
+        audio_url=None,  # 后台生成中
+        ai_memory_hint=None,  # 后台生成中
     )

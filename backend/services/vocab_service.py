@@ -23,13 +23,114 @@ class VocabService:
     def __init__(self):
         self.free_dict_url = "https://api.dictionaryapi.dev/api/v2/entries/en"
     
+    async def generate_quick_vocab(
+        self, 
+        word: str, 
+        context_sentence: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        快速生成词汇基础数据（用于查词时快速响应）
+        只获取音标和释义，其他内容异步生成
+        
+        目标响应时间：< 1.5秒
+        """
+        result = {
+            "word": word,
+            "phonetic": None,
+            "definition": None,
+            "syllables": [word],  # 默认不拆分
+            "example": self._extract_sentence_with_word(context_sentence, word) if context_sentence else "",
+            "audio_url": None,
+            "ai_memory_hint": None,
+            "is_complete": False,  # 标记数据是否完整
+        }
+        
+        # 直接调用 LLM 获取音标和释义（省去 API 调用加快速度）
+        definition_data = await self._get_quick_definition(word, context_sentence)
+        
+        result["phonetic"] = definition_data.get("phonetic", "")
+        result["definition"] = definition_data.get("definition", f"{word} 的释义")
+        
+        logger.info(f"[VocabService] Quick lookup for '{word}' completed")
+        return result
+
+    
+    async def _get_quick_definition(
+        self, 
+        word: str, 
+        context_sentence: Optional[str]
+    ) -> Dict[str, Any]:
+        """快速获取释义（简化的 LLM 调用）"""
+        from services.ai_service import ai_service
+        
+        # 简化的 prompt，只要求释义和音标
+        prompt = f"""请给出单词 "{word}" 的中文释义。
+{("语境：" + context_sentence[:200]) if context_sentence else ""}
+
+只返回 JSON 格式：
+{{"phonetic": "音标如 /wɜːrd/", "definition": "中文释义（如有语境请结合语境翻译）"}}"""
+        
+        try:
+            response = await ai_service.generate_text(prompt=prompt)
+            response = response.strip()
+            if response.startswith("```"):
+                response = re.sub(r'^```\w*\n?', '', response)
+                response = re.sub(r'\n?```$', '', response)
+            return json.loads(response)
+        except Exception as e:
+            logger.error(f"[VocabService] Quick definition failed for '{word}': {e}")
+            return {"definition": f"{word} 的中文释义", "phonetic": ""}
+    
+    async def complete_vocab_data(
+        self,
+        word: str,
+        context_sentence: Optional[str],
+        vocab_card_id: int
+    ):
+        """
+        异步完善词汇数据（后台任务）
+        生成音节、AI助记、TTS音频，然后更新数据库
+        
+        注意：此方法在独立的数据库会话中运行
+        """
+        try:
+            logger.info(f"[VocabService] Starting background completion for '{word}'")
+            
+            # 1. 生成音节和助记
+            llm_result = await self._generate_with_llm(word, context_sentence)
+            
+            # 2. 生成 TTS 音频
+            audio_url = await self._generate_tts(word)
+            
+            # 3. 创建独立的数据库会话并更新
+            from database import AsyncSessionLocal
+            from sqlalchemy import update
+            from models import VocabCard
+            
+            async with AsyncSessionLocal() as db:
+                stmt = update(VocabCard).where(VocabCard.id == vocab_card_id).values(
+                    syllables=llm_result.get("syllables", [word]),
+                    ai_memory_hint=llm_result.get("mnemonic", ""),
+                    audio_url=audio_url
+                )
+                await db.execute(stmt)
+                await db.commit()
+            
+            logger.info(f"[VocabService] Background completion for '{word}' finished")
+            
+        except Exception as e:
+            logger.error(f"[VocabService] Background completion failed for '{word}': {e}")
+            import traceback
+            traceback.print_exc()
+
+    
     async def generate_vocab_data(
         self, 
         word: str, 
         context_sentence: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        生成完整的词汇卡片数据
+        生成完整的词汇卡片数据（保留原方法用于兼容）
         
         Args:
             word: 要查询的单词
@@ -66,6 +167,7 @@ class VocabService:
         result["audio_url"] = await self._generate_tts(word)
         
         return result
+
     
     async def _get_phonetic(self, word: str) -> Optional[str]:
         """从 Free Dictionary API 获取音标"""

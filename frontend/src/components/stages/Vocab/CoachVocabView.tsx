@@ -292,15 +292,59 @@ export const CoachVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded 
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="w-full max-w-md"
+                                            className="w-full space-y-3 max-w-md"
                                         >
-                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                                            {/* 释义 */}
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 0.1 }}
+                                                className="bg-slate-50 rounded-xl p-3 border border-slate-100"
+                                            >
+                                                <p className="text-slate-500 text-xs font-semibold mb-1 uppercase tracking-wider">释义</p>
                                                 <p className="text-slate-800 text-base font-medium">
                                                     {currentCard.definition}
                                                 </p>
-                                            </div>
+                                            </motion.div>
+
+                                            {/* AI助记 */}
+                                            {currentCard.mnemonic && (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: 0.2 }}
+                                                    className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3 border border-blue-100"
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Sparkles size={14} className="text-[#00B4EE]" />
+                                                        <p className="text-[#00B4EE] text-xs font-bold uppercase tracking-wider">AI助记</p>
+                                                    </div>
+                                                    <p className="text-slate-700 text-sm leading-relaxed">
+                                                        {currentCard.mnemonic}
+                                                    </p>
+                                                </motion.div>
+                                            )}
+
+                                            {/* 例句 */}
+                                            {currentCard.contextSentence && (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: 0.3 }}
+                                                    className="bg-amber-50 rounded-xl p-3 border border-amber-100"
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <MessageCircle size={14} className="text-amber-600" />
+                                                        <p className="text-amber-700 text-xs font-bold uppercase tracking-wider">例句</p>
+                                                    </div>
+                                                    <p className="text-slate-700 text-sm italic leading-relaxed">
+                                                        "{currentCard.contextSentence}"
+                                                    </p>
+                                                </motion.div>
+                                            )}
                                         </motion.div>
                                     )}
+
                                 </div>
 
                                 {/* 评分显示 - 在卡片下方居中 */}

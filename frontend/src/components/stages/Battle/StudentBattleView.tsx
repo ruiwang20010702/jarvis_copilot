@@ -23,7 +23,8 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         quizAnswers,
         setQuizAnswer,
         setScrollProgress,
-        setStage
+        setStage,
+        vocabList  // 添加 vocabList 以响应状态变化
     } = useGameStore();
 
     const [selectionRect, setSelectionRect] = useState<{ top: number, left: number } | null>(null);
@@ -614,7 +615,7 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                             </div>
                                         ) : (
                                             (() => {
-                                                const vocabItem = useGameStore.getState().vocabList.find(v => v.word.toLowerCase() === lookupWord.toLowerCase());
+                                                const vocabItem = vocabList.find(v => v.word.toLowerCase() === lookupWord.toLowerCase());
                                                 if (vocabItem) {
                                                     return (
                                                         <div className="space-y-2">

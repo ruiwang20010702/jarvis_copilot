@@ -518,11 +518,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('[Store] Looking up and saving word:', word, 'versionId:', versionId);
       const result = await lookupWord(word, context || '', versionId);
 
+      // 将 API 结果转换为 VocabItem 并添加到 vocabList
+      const vocabItem = transformLookupResult(result);
+
       set((state) => ({
-        lookups: [...state.lookups, { word, context: context || '', versionId }]
+        lookups: [...state.lookups, { word, context: context || '', versionId }],
+        vocabList: [...state.vocabList, vocabItem],
+        vocabStatus: { ...state.vocabStatus, [word]: 'unseen' }
       }));
 
-      console.log('[Store] Word saved successfully:', word);
+      console.log('[Store] Word saved successfully:', word, 'definition:', vocabItem.definition);
     } catch (error) {
       console.error('[Store] Failed to save lookup word:', word, error);
       // 即使失败也添加到本地列表，保证 UI 响应
