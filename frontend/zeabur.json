@@ -1,0 +1,9 @@
+{
+    "build": {
+        "command": "npm run build"
+    },
+    "output": {
+        "type": "static",
+        "dir": "dist"
+    }
+}

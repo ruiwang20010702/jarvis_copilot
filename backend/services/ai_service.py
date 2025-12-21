@@ -174,8 +174,13 @@ async def generate_stream_with_tools(
         contents.insert(1, {"role": "model", "parts": [{"text": "understood, I will follow these instructions."}]})
     
     try:
-        # 使用 Gemini 3 Pro + thinking level low 进行流式生成
+        # 从环境变量获取模型和思考级别配置
+        # GEMINI_MODEL: gemini-2.0-flash (默认), gemini-3-pro-preview, gemini-2.5-flash
+        # GEMINI_THINKING_LEVEL: off (默认), low, high
         from google.genai import types
+        
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        thinking_level = os.getenv("GEMINI_THINKING_LEVEL", "off").lower()
         
         # 转换工具定义为 Gemini 格式
         gemini_tools = None
@@ -191,22 +196,32 @@ async def generate_stream_with_tools(
                 )
             gemini_tools = [types.Tool(function_declarations=function_declarations)]
 
-        # 使用 Gemini 3 Pro + thinking level low
-        config = types.GenerateContentConfig(
-            temperature=0.7,
-            max_output_tokens=2048,
-            tools=gemini_tools,
-            thinking_config=types.ThinkingConfig(thinking_level="low")
-        )
-        
-        print("[AIService] 🧠 Using Gemini 3 Pro with thinking_level=low")
-        
-        # 先发送"思考开始"事件
-        yield {"type": "thinking_start", "content": ""}
+        # 根据思考级别配置生成参数
+        if thinking_level in ["low", "high"]:
+            # 使用思考模式（需要 Gemini 3 Pro）
+            config = types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=2048,
+                tools=gemini_tools,
+                thinking_config=types.ThinkingConfig(thinking_level=thinking_level)
+            )
+            # 强制使用支持思考模式的模型
+            gemini_model = "gemini-3-pro-preview"
+            print(f"[AIService] 🧠 Using {gemini_model} with thinking_level={thinking_level}")
+            # 先发送"思考开始"事件
+            yield {"type": "thinking_start", "content": ""}
+        else:
+            # 不使用思考模式（更快）
+            config = types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=2048,
+                tools=gemini_tools
+            )
+            print(f"[AIService] ⚡ Using {gemini_model} (no thinking mode)")
         
         # 调用流式 API
         response_stream = ai_service.gemini_client.models.generate_content_stream(
-            model="gemini-3-pro-preview",
+            model=gemini_model,
             contents=contents,
             config=config
         )

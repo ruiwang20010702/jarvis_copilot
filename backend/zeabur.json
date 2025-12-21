@@ -1,0 +1,15 @@
+{
+    "build": {
+        "command": null
+    },
+    "start": {
+        "command": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    },
+    "env": {
+        "PORT": "8000",
+        "DATABASE_URL": "${POSTGRES_URL}",
+        "REDIS_URL": "${REDIS_URL}",
+        "DEFAULT_AI_MODEL": "gemini",
+        "COACHING_AI_PROVIDER": "gemini"
+    }
+}
