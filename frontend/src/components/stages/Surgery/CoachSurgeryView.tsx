@@ -193,7 +193,7 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 restoreSentence();
                 setSurgeryMode('student');
                 setCurrentTask({ type: 'student_surgery', instruction: args.instruction || '请删除修饰语，保留主干句' });
-                publishCoachingTask('voice', null, args.instruction || '请删除修饰语，保留主干句');
+                publishCoachingTask('student_surgery', null, args.instruction || '请删除修饰语，保留主干句');
                 break;
 
             case 'complete_surgery':
@@ -203,9 +203,9 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                     setShowSurgeryStructure(false);
                     setCurrentTask(null);
                 } else {
-                    // 最后一题完成，进入下一阶段
-                    console.log('[CoachSurgeryView] All surgeries completed, moving to skill stage');
-                    setStage('skill');
+                    // 最后一题完成，进入结束/复习阶段
+                    console.log('[CoachSurgeryView] All surgeries completed, moving to review stage');
+                    setStage('review');
                 }
 
 
@@ -251,8 +251,8 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 if (toolName === 'complete_surgery') {
                     const isLast = currentSurgeryIndex >= surgeryList.length - 1;
                     instruction = isLast
-                        ? `完成所有句子讲解 (${args.summary || '全部完成'})`
-                        : `完成当前句子讲解，进入下一句 (${args.summary || '讲解完成'})`;
+                        ? `🎉 已完成所有长难句讲解！点击下方按钮进入【复习阶段】`
+                        : `完成当前句子讲解，进入下一句 (${currentSurgeryIndex + 2}/${surgeryList.length})`;
                 }
                 if (toolName === 'simplify_sentence') instruction = '一键移除所有修饰语';
 
@@ -331,8 +331,9 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                 // 学生实操任务完成：把学生保留的块发送给 Jarvis 判断
                 const remainingChunks = surgeryChunks.filter(c => !c.isRemoved).map(c => c.text).join(' ');
                 userMessage = `学生提交的主干句：${remainingChunks}`;
-                // 切回教师模式
+                // 切回教师模式，并关闭结构显示
                 setSurgeryMode('teacher');
+                setShowSurgeryStructure(false);
             } else if (currentTask.type === 'highlight') {
                 userMessage = '（学生已完成标记）';
             }
@@ -613,9 +614,14 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                         </p>
                                         <button
                                             onClick={() => executeToolCall(pendingToolCalls[0].name, pendingToolCalls[0].args)}
-                                            className="w-full py-2 bg-blue-500 text-white text-[10px] font-black rounded-lg hover:bg-blue-600 transition-colors shadow-md shadow-blue-100"
+                                            className={`w-full py-2 text-white text-[10px] font-black rounded-lg transition-colors shadow-md ${pendingToolCalls[0].name === 'complete_surgery' && currentSurgeryIndex >= surgeryList.length - 1
+                                                ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100'
+                                                : 'bg-blue-500 hover:bg-blue-600 shadow-blue-100'
+                                                }`}
                                         >
-                                            确认发布给学生
+                                            {pendingToolCalls[0].name === 'complete_surgery' && currentSurgeryIndex >= surgeryList.length - 1
+                                                ? '✅ 进入复习阶段'
+                                                : '确认发布给学生'}
                                         </button>
                                     </div>
                                 )}

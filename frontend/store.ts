@@ -97,7 +97,7 @@ interface GameStore {
 
   // 6步教学阶段状态
   coachingPhase: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0=未开始, 1-6=6个阶段
-  coachingTaskType: 'highlight' | 'voice' | 'select' | 'gps' | 'review' | null; // 当前任务类型
+  coachingTaskType: 'highlight' | 'voice' | 'select' | 'gps' | 'review' | 'student_surgery' | null; // 当前任务类型
   coachingTaskTarget: 'article' | 'question' | null; // 任务目标区域（主要用于划词）
   coachingTaskReceived: boolean; // 学生是否已接收任务
   coachingTaskCompleted: boolean; // 学生是否已完成任务
@@ -181,7 +181,7 @@ interface GameStore {
   // 6步教学 Actions
   advanceCoachingPhase: () => void; // 教师推进到下一阶段
   setCoachingPhase: (phase: 0 | 1 | 2 | 3 | 4 | 5 | 6) => void;
-  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review', target?: 'article' | 'question', instruction?: string) => void; // 教师发布任务
+  publishCoachingTask: (type: 'highlight' | 'voice' | 'select' | 'gps' | 'review' | 'student_surgery', target?: 'article' | 'question', instruction?: string) => void; // 教师发布任务
   receiveCoachingTask: () => void; // 学生接收任务
   completeCoachingTask: () => void; // 学生完成任务
   addTeacherHighlight: (highlight: { paragraphIndex: number; startOffset: number; endOffset: number; text: string }) => void;

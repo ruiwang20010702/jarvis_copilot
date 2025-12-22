@@ -170,37 +170,6 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                 )}
             </AnimatePresence>
 
-            {/* 录音状态悬浮按钮 */}
-            {coachingTaskReceived && coachingTaskType === 'voice' && (
-                <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
-                >
-                    {isRecording ? (
-                        <button
-                            onClick={handleStopRecording}
-                            className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-full shadow-2xl flex items-center gap-2 animate-pulse"
-                        >
-                            <Mic size={20} />
-                            <span>停止录音</span>
-                        </button>
-                    ) : isTranscribing ? (
-                        <div className="px-6 py-3 bg-slate-100 text-slate-600 font-medium rounded-full shadow-lg flex items-center gap-2">
-                            <Loader2 size={20} className="animate-spin" />
-                            <span>正在识别...</span>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={handleStartRecording}
-                            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold rounded-full shadow-2xl flex items-center gap-2"
-                        >
-                            <Mic size={20} />
-                            <span>开始录音</span>
-                        </button>
-                    )}
-                </motion.div>
-            )}
 
             {/* Left: Sentence Surgery Area */}
             <div
@@ -279,7 +248,7 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                         : 'cursor-default pointer-events-none'
                                                     }
                                                     ${isInteractive && chunk.type === 'modifier' ? 'hover:bg-white/60 hover:shadow-lg' : ''}
-                                                    ${showSurgeryStructure
+                                                    ${showSurgeryStructure && surgeryMode !== 'student'
                                                         ? (chunk.type === 'core'
                                                             ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-400'
                                                             : 'bg-amber-100 text-amber-800 border-2 border-amber-400')
@@ -288,8 +257,8 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                     ${chunk.shake ? '!text-red-500' : ''}
                                                 `}
                                             >
-                                                {/* 成分标签浮动显示 */}
-                                                {showSurgeryStructure && (
+                                                {/* 成分标签浮动显示 - 学生实操模式下不显示（不能给答案） */}
+                                                {showSurgeryStructure && surgeryMode !== 'student' && (
                                                     <div
                                                         className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${chunk.type === 'core'
                                                             ? 'bg-emerald-500 text-white'
@@ -345,8 +314,59 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                             <div className="mt-8 text-center text-slate-500 text-base font-medium">
                                 {surgeryMode === 'student'
                                     ? "点击修饰语部分来简化句子"
-                                    : "等待教师指令..."}
+                                    : coachingTaskReceived && coachingTaskInstruction
+                                        ? coachingTaskInstruction
+                                        : "等待教师指令..."}
                             </div>
+
+                            {/* 录音按钮 - 语音任务 */}
+                            {coachingTaskReceived && coachingTaskType === 'voice' && surgeryMode !== 'student' && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mt-6 flex justify-center"
+                                >
+                                    {isRecording ? (
+                                        <button
+                                            onClick={handleStopRecording}
+                                            className="px-8 py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-full shadow-xl flex items-center gap-2 animate-pulse"
+                                        >
+                                            <Mic size={20} />
+                                            <span>停止录音</span>
+                                        </button>
+                                    ) : isTranscribing ? (
+                                        <div className="px-8 py-3 bg-slate-100 text-slate-600 font-medium rounded-full shadow-lg flex items-center gap-2">
+                                            <Loader2 size={20} className="animate-spin" />
+                                            <span>正在识别...</span>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={handleStartRecording}
+                                            className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold rounded-full shadow-xl flex items-center gap-2 hover:shadow-2xl transition-shadow"
+                                        >
+                                            <Mic size={20} />
+                                            <span>开始录音</span>
+                                        </button>
+                                    )}
+                                </motion.div>
+                            )}
+
+                            {/* 提交按钮 - 学生实操模式 */}
+                            {surgeryMode === 'student' && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mt-6 flex justify-center"
+                                >
+                                    <button
+                                        onClick={completeCoachingTask}
+                                        className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold rounded-full shadow-xl flex items-center gap-2 hover:shadow-2xl transition-shadow"
+                                    >
+                                        <Send size={20} />
+                                        <span>提交任务</span>
+                                    </button>
+                                </motion.div>
+                            )}
                         </div>
                     )}
                 </div>

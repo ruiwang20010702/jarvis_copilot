@@ -136,10 +136,38 @@ class STTService:
                     return transcript
                 else:
                     logger.error(f"[STT] Groq error: {response.status_code} - {response.text}")
+                    # Groq 失败时尝试回退到讯飞
+                    if self.xunfei_available:
+                        logger.warning("[STT] Groq failed, falling back to Xunfei")
+                        return await self._transcribe_xunfei_direct(audio_data, filename, language)
                     return None
                     
         except Exception as e:
             logger.error(f"[STT] Groq failed: {e}")
+            # Groq 异常时尝试回退到讯飞
+            if self.xunfei_available:
+                logger.warning("[STT] Groq exception, falling back to Xunfei")
+                return await self._transcribe_xunfei_direct(audio_data, filename, language)
+            return None
+    
+    async def _transcribe_xunfei_direct(
+        self,
+        audio_data: bytes,
+        filename: str,
+        language: str
+    ) -> Optional[str]:
+        """直接调用讯飞转写（不再回退到 Groq，避免循环）"""
+        try:
+            from services.xunfei_stt_service import xunfei_stt_service
+            result = await xunfei_stt_service.transcribe(audio_data, filename, language)
+            if result:
+                logger.info(f"[STT] Xunfei fallback success: {result[:50]}...")
+                return result
+            else:
+                logger.error("[STT] Xunfei fallback also failed")
+                return None
+        except Exception as e:
+            logger.error(f"[STT] Xunfei fallback error: {e}")
             return None
 
 
