@@ -1,0 +1,6 @@
+# Nixpacks 配置文件
+# 用于在 Zeabur 上安装系统级依赖
+
+[phases.setup]
+# 安装 ffmpeg，用于音频格式转换（发音评分功能需要）
+aptPkgs = ["ffmpeg"]

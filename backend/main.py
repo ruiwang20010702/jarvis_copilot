@@ -13,10 +13,40 @@ load_dotenv()
 
 # Configure logging
 import logging
+import shutil
+import subprocess
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s: %(message)s'
 )
+
+logger = logging.getLogger(__name__)
+
+def check_ffmpeg():
+    """检查 ffmpeg 是否已安装"""
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-version"], 
+                capture_output=True, 
+                text=True, 
+                timeout=5
+            )
+            version_line = result.stdout.split('\n')[0] if result.stdout else "unknown version"
+            logger.info(f"✅ ffmpeg 已安装: {version_line}")
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ ffmpeg 检测失败: {e}")
+            return False
+    else:
+        logger.warning("⚠️ ffmpeg 未安装！发音评分功能将无法正常工作。")
+        logger.warning("   请安装 ffmpeg: brew install ffmpeg (macOS) 或 apt install ffmpeg (Linux)")
+        return False
+
+# 启动时检查 ffmpeg
+check_ffmpeg()
 
 app = FastAPI(
     title="Jarvis Backend API",
