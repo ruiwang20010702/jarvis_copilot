@@ -28,8 +28,8 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
     };
 
     const triggerOpening = () => {
-        addMessage({ role: 'coach', text: 'Hi Alex! 我注意到你喜欢篮球，今天准备好读一篇篮球相关的文章了吗？' });
-        setQuickReplies(["教练好！我准备好了！🏀", "我想先聊聊昨天的比赛"]);
+        addMessage({ role: 'coach', text: 'Hi Alex! 我注意到你喜欢机器人，今天准备好读一篇机器人相关的文章了吗？' });
+        setQuickReplies(["教练好！我准备好了！🤖", "我想先聊聊机器人的话题"]);
     };
 
     return (
@@ -79,7 +79,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                 <div className="px-3.5 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 border shadow-sm animate-pulse hover:scale-105 transition-all duration-300"
                                     style={{ backgroundColor: 'rgba(0, 180, 238, 0.08)', borderColor: 'rgba(0, 180, 238, 0.25)', color: '#0088CC' }}>
                                     <Dribbble className="w-3.5 h-3.5 shrink-0" style={{ color: '#00B4EE' }} />
-                                    <span>篮球</span>
+                                    <span>机器人</span>
                                 </div>
                                 <div className="px-3.5 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 bg-yellow-50/80 border border-yellow-200 shadow-sm animate-pulse hover:scale-105 transition-all duration-300 text-yellow-700">
                                     <Snowflake className="w-3.5 h-3.5 shrink-0 text-yellow-600" />
@@ -213,7 +213,7 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                 发送开场白
                             </h3>
                             <p className="text-xs text-slate-600 leading-relaxed">
-                                "Hi Alex! 我注意到你喜欢篮球，今天准备好读一篇篮球相关的文章了吗？"
+                                "Hi Alex! 我注意到你喜欢机器人，今天准备好读一篇机器人相关的文章了吗？"
                             </p>
                         </div>
                         <div className="ml-3 shrink-0">
@@ -247,10 +247,10 @@ export const CoachWarmupView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                                 <div key={m.id} className={`flex flex-col ${m.role === 'coach' ? 'items-end' : 'items-start'}`}>
                                     <span className="text-[10px] text-slate-400 mb-1 uppercase">{m.role}</span>
                                     <div className={`p-3 rounded-xl max-w-[85%] text-sm ${m.role === 'coach'
-                                            ? 'text-white'
-                                            : m.role === 'student'
-                                                ? 'bg-slate-100 text-slate-700'
-                                                : 'bg-yellow-50 text-yellow-800'
+                                        ? 'text-white'
+                                        : m.role === 'student'
+                                            ? 'bg-slate-100 text-slate-700'
+                                            : 'bg-yellow-50 text-yellow-800'
                                         }`}
                                         style={m.role === 'coach' ? { backgroundColor: '#00B4EE' } : {}}
                                     >

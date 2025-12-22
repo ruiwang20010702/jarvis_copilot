@@ -73,7 +73,7 @@ export const StudentWarmupView: React.FC = () => {
                             }}
                         >
                             <Target size={16} className="shrink-0" />
-                            <span>篮球</span>
+                            <span>机器人</span>
                         </motion.div>
                         <motion.div
                             className="px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2"

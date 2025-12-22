@@ -588,7 +588,14 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
                                         >
                                             <div
                                                 className="p-4 cursor-pointer hover:bg-white/30 transition-colors"
-                                                onClick={() => setExpandedQuestion(isExpanded ? null : item.questionId)}
+                                                onClick={(e) => {
+                                                    // 如果用户正在选择文本，不触发展开/收缩
+                                                    const selection = window.getSelection();
+                                                    if (selection && selection.toString().trim().length > 0) {
+                                                        return;
+                                                    }
+                                                    setExpandedQuestion(isExpanded ? null : item.questionId);
+                                                }}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">

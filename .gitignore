@@ -1,10 +1,38 @@
+# ===== 环境配置 =====
 backend/.env
+frontend/.env
 
-# 测试音频
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+
+# ===== Node.js =====
+node_modules/
+dist/
+.cache/
+
+# ===== 测试文件 =====
+backend/test_*.py
 backend/static/audio/*.mp3
 backend/static/audio/*.wav
 backend/static/audio/*.pcm
 
-# Python 缓存
-__pycache__/
-*.pyc
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== 临时文件 =====
+*.tmp
+*.temp

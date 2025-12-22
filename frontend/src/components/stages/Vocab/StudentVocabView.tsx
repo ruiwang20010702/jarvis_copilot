@@ -92,13 +92,20 @@ export const StudentVocabView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
         console.log('[StudentVocab] handleRecordToggle called', { vocabSpeakEnabled, recordingState });
         if (recordingState === 'finished') return;
 
-        if (recordingState === 'idle') {
+        // 'idle' 或 'playing_standard'（播放标准音后）都可以开始录音
+        if (recordingState === 'idle' || recordingState === 'playing_standard') {
             // 开始录音
             try {
-                await audioRecorder.startRecording();
-                setRecordingState('recording');
-                // 同步录音状态到教师端
-                useGameStore.setState({ studentRecordingState: 'recording' });
+                const started = await audioRecorder.startRecording();
+                if (started) {
+                    setRecordingState('recording');
+                    // 同步录音状态到教师端
+                    useGameStore.setState({ studentRecordingState: 'recording' });
+                } else {
+                    // startRecording 返回 false，说明麦克风获取失败
+                    console.error('[StudentVocab] Failed to start recording - returned false');
+                    alert('🎤 录音启动失败\n\n请检查麦克风权限或连接状态。');
+                }
             } catch (error) {
                 console.error('Failed to start recording:', error);
                 // 显示用户可见的错误提示

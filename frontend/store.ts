@@ -738,7 +738,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         vocabCardFlipped: false,
         isSyllableMode: false,
         isPlayingAudio: 'none',
-        vocabSpeakEnabled: false
+        vocabSpeakEnabled: false,
+        vocabRecordingScore: null,
+        vocabRecordingDetail: null,
+        studentRecordingState: 'idle'
       };
     }
     return {
@@ -746,7 +749,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       vocabCardFlipped: false,
       isSyllableMode: false,
       isPlayingAudio: 'none',
-      vocabSpeakEnabled: false
+      vocabSpeakEnabled: false,
+      vocabRecordingScore: null,
+      vocabRecordingDetail: null,
+      studentRecordingState: 'idle'
     };
   }),
   setVocabCardFlipped: (flipped) => set({ vocabCardFlipped: flipped }),
