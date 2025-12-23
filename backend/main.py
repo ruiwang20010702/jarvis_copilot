@@ -95,8 +95,8 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=port, 
         reload=False,  # SSL requires reload=False
-        ssl_keyfile="server.key",
-        ssl_certfile="server.crt"
+        ssl_keyfile="key.pem",
+        ssl_certfile="cert.pem"
     )
 
 
