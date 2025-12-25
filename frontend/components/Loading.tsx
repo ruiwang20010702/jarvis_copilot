@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2, Cpu, FileText, User, Server, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store';
-import { resetRoom } from '../src/sync';
-
 const STEPS = [
   { icon: Server, text: "正在连接课堂..." },
   { icon: User, text: "加载学生档案..." },
@@ -37,8 +35,6 @@ const Loading: React.FC = () => {
   }, [navigate, userRole]);
 
   const handleEnterClass = () => {
-    // 进入教室时清空房间状态，确保新课程从空白开始
-    resetRoom();
     navigate('/class');
   };
 
