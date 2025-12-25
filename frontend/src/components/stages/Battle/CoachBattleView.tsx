@@ -52,9 +52,11 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
         }
     };
 
-    const renderParagraph = (text: string) => {
+    const renderParagraph = (text: string, paragraphIndex: number) => {
+        // 只渲染当前段落的高亮
+        const paragraphHighlights = highlights.filter(h => h.paragraphIndex === paragraphIndex);
         let parts = [{ text, isHighlight: false }];
-        highlights.forEach(h => {
+        paragraphHighlights.forEach(h => {
             const newParts: typeof parts = [];
             parts.forEach(part => {
                 if (part.isHighlight) { newParts.push(part); }
@@ -95,7 +97,7 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
                     <div className="p-8 relative">
                         <div className="max-w-3xl mx-auto">
                             <h2 className="text-3xl font-bold text-slate-800 mb-8 font-serif">{articleData.title}</h2>
-                            {articleData.paragraphs.map((para, i) => <div key={i}>{renderParagraph(para)}</div>)}
+                            {articleData.paragraphs.map((para, i) => <div key={i}>{renderParagraph(para, i)}</div>)}
                         </div>
                     </div>
 

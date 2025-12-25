@@ -373,8 +373,8 @@ export const CoachCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
         let content: React.ReactNode = para;
 
-        // 1. 先渲染实战阶段的黄色高亮（做题痕迹）
-        highlights.forEach(h => {
+        // 1. 先渲染实战阶段的黄色高亮（做题痕迹，只显示当前段落的高亮）
+        highlights.filter(h => h.paragraphIndex === paraIndex).forEach(h => {
             if (para.includes(h.text)) {
                 const parts = para.split(h.text);
                 content = (

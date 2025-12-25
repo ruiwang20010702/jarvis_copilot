@@ -127,11 +127,14 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     };
 
     const confirmHighlight = () => {
-        if (selectedText) {
-            // Check if selected text is part of any existing highlight (or vice versa)
+        if (selectedText && selectedLocation) {
+            const paragraphIndex = selectedLocation.paragraphIndex;
+            // Check if selected text is part of any existing highlight in the SAME paragraph
             const existingHighlights = highlights.filter(h =>
-                h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
-                selectedText.toLowerCase().includes(h.text.toLowerCase())
+                h.paragraphIndex === paragraphIndex && (
+                    h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
+                    selectedText.toLowerCase().includes(h.text.toLowerCase())
+                )
             );
 
             if (existingHighlights.length > 0) {
@@ -154,13 +157,13 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         parts.forEach(part => {
                             const trimmedPart = part.trim();
                             if (trimmedPart.length > 0) {
-                                addHighlight(trimmedPart);
+                                addHighlight(trimmedPart, paragraphIndex);
                             }
                         });
                     }
                 });
             } else {
-                addHighlight(selectedText);
+                addHighlight(selectedText, paragraphIndex);
             }
             setSelectionRect(null);
             setSelectedLocation(null);
@@ -201,14 +204,16 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const handleWordHighlight = () => {
         if (clickedWord) {
+            // 检查高亮时同时比较 paragraphIndex
             const existingHighlight = highlights.find(h =>
-                h.text.toLowerCase() === clickedWord.word.toLowerCase()
+                h.text.toLowerCase() === clickedWord.word.toLowerCase() &&
+                h.paragraphIndex === clickedWord.paragraphIndex
             );
 
             if (existingHighlight) {
                 removeHighlight(existingHighlight.id);
             } else {
-                addHighlight(clickedWord.word);
+                addHighlight(clickedWord.word, clickedWord.paragraphIndex);
             }
             setClickedWord(null);
         }
@@ -216,8 +221,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const renderParagraph = (text: string, paragraphIndex: number) => {
         // 1. Use the same split logic as CoachBattleView to separate highlighted and non-highlighted text
+        // 只处理当前段落的高亮
+        const paragraphHighlights = highlights.filter(h => h.paragraphIndex === paragraphIndex);
         let parts = [{ text, isHighlight: false }];
-        highlights.forEach(h => {
+        paragraphHighlights.forEach(h => {
             const highlightText = h.text.trim();
             if (!highlightText) return;
 
@@ -309,10 +316,12 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             {/* 点击单词后的浮动工具栏 */}
             <AnimatePresence>
                 {clickedWord && (() => {
-                    // Check if the clicked word is part of ANY existing highlight
+                    // Check if the clicked word is part of any existing highlight in the SAME paragraph
                     const existingHighlight = highlights.find(h =>
-                        h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
-                        clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
+                        h.paragraphIndex === clickedWord.paragraphIndex && (
+                            h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
+                            clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
+                        )
                     );
 
                     const isHighlighted = !!existingHighlight;
@@ -332,14 +341,16 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (isHighlighted) {
-                                        // Find ALL matching highlights to ensure visual removal
+                                        // Find ALL matching highlights in the same paragraph to ensure visual removal
                                         const matchingHighlights = highlights.filter(h =>
-                                            h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
-                                            clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
+                                            h.paragraphIndex === clickedWord.paragraphIndex && (
+                                                h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
+                                                clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
+                                            )
                                         );
                                         matchingHighlights.forEach(h => removeHighlight(h.id));
                                     } else {
-                                        addHighlight(clickedWord.word);
+                                        addHighlight(clickedWord.word, clickedWord.paragraphIndex);
                                     }
                                     setClickedWord(null);
                                 }}
@@ -375,11 +386,13 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             </AnimatePresence>
 
             <AnimatePresence>
-                {selectionRect && (() => {
-                    // Check if selected text is part of any existing highlight
+                {selectionRect && selectedLocation && (() => {
+                    // Check if selected text is part of any existing highlight in the same paragraph
                     const isHighlighted = selectedText && highlights.some(h =>
-                        h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
-                        selectedText.toLowerCase().includes(h.text.toLowerCase())
+                        h.paragraphIndex === selectedLocation.paragraphIndex && (
+                            h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
+                            selectedText.toLowerCase().includes(h.text.toLowerCase())
+                        )
                     );
                     return (
                         <motion.div
