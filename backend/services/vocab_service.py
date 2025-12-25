@@ -49,7 +49,7 @@ class VocabService:
         definition_data = await self._get_quick_definition(word, context_sentence)
         
         result["phonetic"] = definition_data.get("phonetic", "")
-        result["definition"] = definition_data.get("definition", f"{word} 的释义")
+        result["definition"] = definition_data.get("definition", "(加载中...)")
         
         logger.info(f"[VocabService] Quick lookup for '{word}' completed")
         return result
@@ -64,22 +64,64 @@ class VocabService:
         from services.ai_service import ai_service
         
         # 简化的 prompt，只要求释义和音标
-        prompt = f"""请给出单词 "{word}" 的中文释义。
-{("语境：" + context_sentence[:200]) if context_sentence else ""}
+        context_hint = f"\n语境：{context_sentence[:200]}" if context_sentence else ""
+        prompt = f"""请给出英文单词 "{word}" 的中文释义和音标。{context_hint}
 
-只返回 JSON 格式：
-{{"phonetic": "音标如 /wɜːrd/", "definition": "中文释义（如有语境请结合语境翻译）"}}"""
+要求：
+1. definition 必须是这个单词的实际中文意思，不是描述
+2. 如有语境，请结合语境给出最贴切的释义
+
+只返回 JSON，不要其他文字：
+{{"phonetic": "/音标/", "definition": "中文释义"}}"""
         
         try:
             response = await ai_service.generate_text(prompt=prompt)
+            logger.info(f"[VocabService] LLM raw response for '{word}': {response[:200]}")
+            
             response = response.strip()
             if response.startswith("```"):
                 response = re.sub(r'^```\w*\n?', '', response)
                 response = re.sub(r'\n?```$', '', response)
-            return json.loads(response)
+            
+            result = json.loads(response)
+            
+            # 验证返回的 definition 是有效的
+            definition = result.get("definition", "")
+            if not definition or "释义" in definition or definition == word:
+                logger.warning(f"[VocabService] Invalid definition for '{word}': {definition}")
+                # 尝试使用备用字典 API
+                return await self._fallback_definition(word)
+            
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"[VocabService] JSON parse failed for '{word}': {e}, response: {response[:100]}")
+            return await self._fallback_definition(word)
         except Exception as e:
             logger.error(f"[VocabService] Quick definition failed for '{word}': {e}")
-            return {"definition": f"{word} 的中文释义", "phonetic": ""}
+            return await self._fallback_definition(word)
+    
+    async def _fallback_definition(self, word: str) -> Dict[str, Any]:
+        """备用：使用免费字典 API 获取释义"""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self.free_dict_url}/{word}")
+                if response.status_code == 200:
+                    data = response.json()
+                    if data and len(data) > 0:
+                        entry = data[0]
+                        phonetic = entry.get("phonetic", "")
+                        # 获取第一个释义
+                        meanings = entry.get("meanings", [])
+                        if meanings:
+                            definitions = meanings[0].get("definitions", [])
+                            if definitions:
+                                eng_def = definitions[0].get("definition", "")
+                                # 返回英文释义（稍后可以翻译）
+                                return {"phonetic": phonetic, "definition": eng_def, "is_english": True}
+        except Exception as e:
+            logger.warning(f"[VocabService] Fallback API failed for '{word}': {e}")
+        
+        return {"definition": f"(查询失败，请重试)", "phonetic": ""}
     
     async def complete_vocab_data(
         self,
@@ -156,7 +198,7 @@ class VocabService:
         
         # 2. LLM 生成：语境翻译 + 音节 + AI助记 + 备选音标
         llm_result = await self._generate_with_llm(word, context_sentence)
-        result["definition"] = llm_result.get("definition", f"{word} 的释义")
+        result["definition"] = llm_result.get("definition", "(释义生成失败)")
         result["syllables"] = llm_result.get("syllables", [word])
         result["ai_memory_hint"] = llm_result.get("mnemonic", "")
         
@@ -197,22 +239,24 @@ class VocabService:
         """使用 LLM 生成语境翻译、音节拆分和 AI 助记"""
         from services.ai_service import ai_service
         
+        context_hint = f"\n原句: {context_sentence}" if context_sentence else ""
         prompt = f"""你是一个英语词汇助教。请分析以下单词并返回 JSON 格式。
 
-单词: {word}
-{"原句: " + context_sentence if context_sentence else ""}
+单词: {word}{context_hint}
 
 请返回以下 JSON 格式（只返回 JSON，不要其他内容）:
 {{
     "phonetic": "国际音标，如 /əbˈsest/",
-    "definition": "中文释义（如果有原句，请根据原句语境翻译，格式如：'adj. 着迷的 (此句中指沉迷于...)'）",
-    "syllables": ["音节1", "音节2", ...],  // 按发音拆分，如 obsessed -> ["ob", "sessed"]
-    "mnemonic": "💡 趣味记忆法，如拆分联想、谐音等，要有趣好记（50字以内）"
+    "definition": "中文释义，必须是实际意思如 'adj. 着迷的'，不要写'XX的释义'这种描述",
+    "syllables": ["音节1", "音节2"],
+    "mnemonic": "💡 趣味记忆法（50字以内）"
 }}
-"""
+
+注意：definition 必须是单词的实际中文翻译！"""
         
         try:
             response = await ai_service.generate_text(prompt=prompt)
+            logger.info(f"[VocabService] LLM full response for '{word}': {response[:300]}")
             
             # 解析 JSON
             response = response.strip()
@@ -220,12 +264,29 @@ class VocabService:
                 response = re.sub(r'^```\w*\n?', '', response)
                 response = re.sub(r'\n?```$', '', response)
             
-            return json.loads(response)
+            result = json.loads(response)
+            
+            # 验证 definition 有效性
+            definition = result.get("definition", "")
+            if "释义" in definition or not definition:
+                logger.warning(f"[VocabService] Invalid LLM definition: {definition}")
+                # 尝试用备用方法
+                fallback = await self._fallback_definition(word)
+                result["definition"] = fallback.get("definition", "(释义生成失败)")
+            
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"[VocabService] JSON parse failed for '{word}': {e}")
+            fallback = await self._fallback_definition(word)
+            return {
+                "definition": fallback.get("definition", "(释义生成失败)"),
+                "syllables": self._simple_syllable_split(word),
+                "mnemonic": ""
+            }
         except Exception as e:
             logger.error(f"[VocabService] LLM generation failed for '{word}': {e}")
-            # Fallback
             return {
-                "definition": f"{word} 的中文释义",
+                "definition": "(释义生成失败，请重试)",
                 "syllables": self._simple_syllable_split(word),
                 "mnemonic": ""
             }
