@@ -289,55 +289,77 @@ export const StudentCoachingView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbe
         // 检查当前段落是否是错题相关段落
         const isRelatedToWrongQuestion = currentWrongQuestion?.relatedParagraphIndices?.includes(paraIndex);
 
-        let content: React.ReactNode = para;
+        // 收集所有高亮区域，按 startOffset 排序
+        const allHighlightRanges: Array<{
+            start: number;
+            end: number;
+            text: string;
+            type: 'battle' | 'teacher' | 'student';
+        }> = [];
 
-        // 1. 实战阶段黄色高亮（只显示当前段落的高亮）
+        // 1. 实战阶段黄色高亮（使用精确位置）
         highlights.filter(h => h.paragraphIndex === paraIndex).forEach(h => {
-            if (para.includes(h.text)) {
-                const parts = para.split(h.text);
-                content = (
-                    <>
-                        {parts[0]}
-                        <span className="bg-yellow-200/60 text-yellow-900 px-0.5 rounded" title="我的标记">
-                            {h.text}
-                        </span>
-                        {parts.slice(1).join(h.text)}
-                    </>
-                );
-            }
+            allHighlightRanges.push({
+                start: h.startOffset,
+                end: h.startOffset + h.text.length,
+                text: h.text,
+                type: 'battle'
+            });
         });
 
         // 2. 教师红色画线
-        teacherHighlights.forEach(h => {
-            if (h.paragraphIndex === paraIndex && para.includes(h.text)) {
-                const parts = para.split(h.text);
-                content = (
-                    <>
-                        {parts[0]}
-                        <span className="bg-red-200 text-red-900 px-0.5 rounded underline decoration-red-500 decoration-2">
-                            {h.text}
-                        </span>
-                        {parts.slice(1).join(h.text)}
-                    </>
-                );
-            }
+        teacherHighlights.filter(h => h.paragraphIndex === paraIndex).forEach(h => {
+            allHighlightRanges.push({
+                start: h.startOffset,
+                end: h.endOffset,
+                text: h.text,
+                type: 'teacher'
+            });
         });
 
         // 3. 学生带练阶段画线
-        studentHighlights.forEach(h => {
-            if (h.paragraphIndex === paraIndex && para.includes(h.text)) {
-                const parts = para.split(h.text);
-                content = (
-                    <>
-                        {parts[0]}
-                        <span className="bg-amber-300 text-amber-900 px-0.5 rounded font-medium">
-                            {h.text}
-                        </span>
-                        {parts.slice(1).join(h.text)}
-                    </>
-                );
-            }
+        studentHighlights.filter(h => h.paragraphIndex === paraIndex).forEach(h => {
+            allHighlightRanges.push({
+                start: h.startOffset,
+                end: h.endOffset,
+                text: h.text,
+                type: 'student'
+            });
         });
+
+        // 按起始位置排序
+        allHighlightRanges.sort((a, b) => a.start - b.start);
+
+        // 构建渲染片段
+        const segments: React.ReactNode[] = [];
+        let currentOffset = 0;
+
+        allHighlightRanges.forEach((range, idx) => {
+            // 添加高亮前的普通文本
+            if (range.start > currentOffset) {
+                segments.push(<span key={`text-${idx}`}>{para.slice(currentOffset, range.start)}</span>);
+            }
+            // 添加高亮文本
+            const highlightClass = range.type === 'battle'
+                ? 'bg-yellow-200/60 text-yellow-900 px-0.5 rounded'
+                : range.type === 'teacher'
+                    ? 'bg-red-200 text-red-900 px-0.5 rounded underline decoration-red-500 decoration-2'
+                    : 'bg-amber-300 text-amber-900 px-0.5 rounded font-medium';
+            const title = range.type === 'battle' ? '我的标记' : range.type === 'teacher' ? '老师标记' : '带练标记';
+            segments.push(
+                <span key={`highlight-${idx}`} className={highlightClass} title={title}>
+                    {para.slice(range.start, range.end)}
+                </span>
+            );
+            currentOffset = range.end;
+        });
+
+        // 添加最后一段普通文本
+        if (currentOffset < para.length) {
+            segments.push(<span key="text-last">{para.slice(currentOffset)}</span>);
+        }
+
+        const content = segments.length > 0 ? segments : para;
 
         return (
             <div

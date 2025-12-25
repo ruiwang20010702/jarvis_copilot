@@ -53,26 +53,48 @@ export const CoachBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded
     };
 
     const renderParagraph = (text: string, paragraphIndex: number) => {
-        // 只渲染当前段落的高亮
-        const paragraphHighlights = highlights.filter(h => h.paragraphIndex === paragraphIndex);
-        let parts = [{ text, isHighlight: false }];
+        // 获取当前段落的高亮，按 startOffset 排序
+        const paragraphHighlights = highlights
+            .filter(h => h.paragraphIndex === paragraphIndex)
+            .sort((a, b) => a.startOffset - b.startOffset);
+
+        // 基于位置构建文本片段
+        const segments: Array<{ text: string, isHighlight: boolean }> = [];
+        let currentOffset = 0;
+
         paragraphHighlights.forEach(h => {
-            const newParts: typeof parts = [];
-            parts.forEach(part => {
-                if (part.isHighlight) { newParts.push(part); }
-                else {
-                    const split = part.text.split(h.text);
-                    for (let i = 0; i < split.length; i++) {
-                        if (i > 0) newParts.push({ text: h.text, isHighlight: true });
-                        if (split[i]) newParts.push({ text: split[i], isHighlight: false });
-                    }
-                }
+            // 添加高亮前的普通文本
+            if (h.startOffset > currentOffset) {
+                segments.push({
+                    text: text.slice(currentOffset, h.startOffset),
+                    isHighlight: false
+                });
+            }
+            // 添加高亮文本
+            const endOffset = h.startOffset + h.text.length;
+            segments.push({
+                text: text.slice(h.startOffset, endOffset),
+                isHighlight: true
             });
-            parts = newParts;
+            currentOffset = endOffset;
         });
+
+        // 添加最后一段普通文本
+        if (currentOffset < text.length) {
+            segments.push({
+                text: text.slice(currentOffset),
+                isHighlight: false
+            });
+        }
+
+        // 如果没有高亮，整段都是普通文本
+        if (segments.length === 0) {
+            segments.push({ text, isHighlight: false });
+        }
+
         return (
             <p className="mb-4 text-sm leading-relaxed text-slate-600 font-serif">
-                {parts.map((part, i) => part.isHighlight ? <span key={i} className="bg-yellow-200 text-slate-900 rounded px-0.5">{part.text}</span> : <span key={i}>{part.text}</span>)}
+                {segments.map((segment, i) => segment.isHighlight ? <span key={i} className="bg-yellow-200 text-slate-900 rounded px-0.5">{segment.text}</span> : <span key={i}>{segment.text}</span>)}
             </p>
         );
     };

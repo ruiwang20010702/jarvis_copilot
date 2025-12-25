@@ -34,6 +34,7 @@ export interface Highlight {
   text: string; // Selected text content
   color: string;
   paragraphIndex: number; // 段落索引，用于精确定位高亮位置
+  startOffset: number; // 在段落中的起始字符偏移量，用于精确定位
 }
 
 export interface QuizAnswer {
@@ -160,7 +161,7 @@ interface GameStore {
 
   // Battle Actions
   addLookup: (word: string, context?: string, versionId?: number) => Promise<void>;
-  addHighlight: (text: string, paragraphIndex: number) => void;
+  addHighlight: (text: string, paragraphIndex: number, startOffset: number) => void;
   removeHighlight: (id: string) => void;
   setQuizAnswer: (qId: number, oId: string, isUnsure: boolean) => void;
   setScrollProgress: (progress: number) => void;
@@ -537,8 +538,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }));
     }
   },
-  addHighlight: (text, paragraphIndex) => set((state) => ({
-    highlights: [...state.highlights, { id: Math.random().toString(36).substring(7), text, color: 'yellow', paragraphIndex }]
+  addHighlight: (text, paragraphIndex, startOffset) => set((state) => ({
+    highlights: [...state.highlights, { id: Math.random().toString(36).substring(7), text, color: 'yellow', paragraphIndex, startOffset }]
   })),
   removeHighlight: (id) => set((state) => ({
     highlights: state.highlights.filter(h => h.id !== id)

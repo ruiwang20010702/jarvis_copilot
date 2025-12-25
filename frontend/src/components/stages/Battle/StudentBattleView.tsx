@@ -34,7 +34,7 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
     const [isLookingUp, setIsLookingUp] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [pendingAnswer, setPendingAnswer] = useState<{ questionId: number, optionId: string } | null>(null);
-    const [clickedWord, setClickedWord] = useState<{ word: string, rect: DOMRect, paragraphIndex: number } | null>(null);
+    const [clickedWord, setClickedWord] = useState<{ word: string, rect: DOMRect, paragraphIndex: number, startOffset: number } | null>(null);
     const articleRef = useRef<HTMLDivElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -128,42 +128,29 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const confirmHighlight = () => {
         if (selectedText && selectedLocation) {
-            const paragraphIndex = selectedLocation.paragraphIndex;
-            // Check if selected text is part of any existing highlight in the SAME paragraph
-            const existingHighlights = highlights.filter(h =>
-                h.paragraphIndex === paragraphIndex && (
-                    h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
-                    selectedText.toLowerCase().includes(h.text.toLowerCase())
-                )
+            const { paragraphIndex, startOffset, endOffset } = selectedLocation;
+            // Check if there's an existing highlight at the exact same position
+            const existingHighlight = highlights.find(h =>
+                h.paragraphIndex === paragraphIndex &&
+                h.startOffset === startOffset &&
+                h.text.length === selectedText.length
             );
 
-            if (existingHighlights.length > 0) {
-                existingHighlights.forEach(h => {
-                    // Case 1: The highlight is fully contained in the selection (e.g. select "Hello World", highlight was "Hello")
-                    // We just remove it.
-                    if (selectedText.toLowerCase().includes(h.text.toLowerCase())) {
-                        removeHighlight(h.id);
-                    }
-                    // Case 2: The selection is inside the highlight (e.g. select "Hello", highlight was "Hello World")
-                    // We remove the original, and add the remaining parts.
-                    else if (h.text.toLowerCase().includes(selectedText.toLowerCase())) {
-                        removeHighlight(h.id);
-
-                        // Split the highlight text by the selected text
-                        // Use regex for case-insensitive splitting
-                        const escapedSelection = selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const parts = h.text.split(new RegExp(escapedSelection, 'gi'));
-
-                        parts.forEach(part => {
-                            const trimmedPart = part.trim();
-                            if (trimmedPart.length > 0) {
-                                addHighlight(trimmedPart, paragraphIndex);
-                            }
-                        });
-                    }
-                });
+            if (existingHighlight) {
+                // Toggle off - remove the highlight
+                removeHighlight(existingHighlight.id);
             } else {
-                addHighlight(selectedText, paragraphIndex);
+                // Check for overlapping highlights and handle them
+                const overlappingHighlights = highlights.filter(h =>
+                    h.paragraphIndex === paragraphIndex &&
+                    !(h.startOffset + h.text.length <= startOffset || h.startOffset >= endOffset)
+                );
+
+                // Remove overlapping highlights
+                overlappingHighlights.forEach(h => removeHighlight(h.id));
+
+                // Add new highlight with precise position
+                addHighlight(selectedText, paragraphIndex, startOffset);
             }
             setSelectionRect(null);
             setSelectedLocation(null);
@@ -184,10 +171,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
         }
     };
 
-    const handleWordClick = (word: string, event: React.MouseEvent<HTMLSpanElement>, paragraphIndex: number) => {
+    const handleWordClick = (word: string, event: React.MouseEvent<HTMLSpanElement>, paragraphIndex: number, startOffset: number) => {
         event.stopPropagation();
         const rect = event.currentTarget.getBoundingClientRect();
-        setClickedWord({ word, rect, paragraphIndex });
+        setClickedWord({ word, rect, paragraphIndex, startOffset });
     };
 
     const handleWordLookup = async () => {
@@ -204,72 +191,80 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
     const handleWordHighlight = () => {
         if (clickedWord) {
-            // 检查高亮时同时比较 paragraphIndex
+            // 检查高亮时同时比较 paragraphIndex 和 startOffset
             const existingHighlight = highlights.find(h =>
-                h.text.toLowerCase() === clickedWord.word.toLowerCase() &&
-                h.paragraphIndex === clickedWord.paragraphIndex
+                h.paragraphIndex === clickedWord.paragraphIndex &&
+                h.startOffset === clickedWord.startOffset &&
+                h.text.length === clickedWord.word.length
             );
 
             if (existingHighlight) {
                 removeHighlight(existingHighlight.id);
             } else {
-                addHighlight(clickedWord.word, clickedWord.paragraphIndex);
+                addHighlight(clickedWord.word, clickedWord.paragraphIndex, clickedWord.startOffset);
             }
             setClickedWord(null);
         }
     };
 
     const renderParagraph = (text: string, paragraphIndex: number) => {
-        // 1. Use the same split logic as CoachBattleView to separate highlighted and non-highlighted text
-        // 只处理当前段落的高亮
-        const paragraphHighlights = highlights.filter(h => h.paragraphIndex === paragraphIndex);
-        let parts = [{ text, isHighlight: false }];
+        // 获取当前段落的高亮，按 startOffset 排序
+        const paragraphHighlights = highlights
+            .filter(h => h.paragraphIndex === paragraphIndex)
+            .sort((a, b) => a.startOffset - b.startOffset);
+
+        // 基于位置构建文本片段
+        const segments: Array<{ text: string, isHighlight: boolean, startOffset: number }> = [];
+        let currentOffset = 0;
+
         paragraphHighlights.forEach(h => {
-            const highlightText = h.text.trim();
-            if (!highlightText) return;
-
-            const newParts: typeof parts = [];
-            parts.forEach(part => {
-                if (part.isHighlight) {
-                    newParts.push(part);
-                } else {
-                    // Split by the highlight text (case-insensitive check could be added if needed, 
-                    // but CoachView uses simple split which is case-sensitive usually, 
-                    // here we use a regex split to be safe or just simple split if exact match is expected)
-
-                    // To support case-insensitive splitting like "World" vs "world", we can use regex
-                    // Escape regex special characters in highlightText
-                    const escapedText = highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`(${escapedText})`, 'gi');
-
-                    const split = part.text.split(regex);
-                    split.forEach(s => {
-                        if (!s) return;
-                        // If the split part matches the highlight text (ignoring case), mark it
-                        if (s.toLowerCase() === highlightText.toLowerCase()) {
-                            newParts.push({ text: s, isHighlight: true });
-                        } else {
-                            newParts.push({ text: s, isHighlight: false });
-                        }
-                    });
-                }
+            // 添加高亮前的普通文本
+            if (h.startOffset > currentOffset) {
+                segments.push({
+                    text: text.slice(currentOffset, h.startOffset),
+                    isHighlight: false,
+                    startOffset: currentOffset
+                });
+            }
+            // 添加高亮文本
+            const endOffset = h.startOffset + h.text.length;
+            segments.push({
+                text: text.slice(h.startOffset, endOffset),
+                isHighlight: true,
+                startOffset: h.startOffset
             });
-            parts = newParts;
+            currentOffset = endOffset;
         });
 
-        // 2. Helper to render tokens within a part (for click-to-lookup)
-        const renderTokens = (partText: string, isPartHighlighted: boolean) => {
-            const tokens: Array<{ text: string, isWord: boolean }> = [];
+        // 添加最后一段普通文本
+        if (currentOffset < text.length) {
+            segments.push({
+                text: text.slice(currentOffset),
+                isHighlight: false,
+                startOffset: currentOffset
+            });
+        }
+
+        // 如果没有高亮，整段都是普通文本
+        if (segments.length === 0) {
+            segments.push({ text, isHighlight: false, startOffset: 0 });
+        }
+
+        // Helper to render tokens within a segment (for click-to-lookup)
+        const renderTokens = (segmentText: string, isSegmentHighlighted: boolean, segmentStartOffset: number) => {
+            const tokens: Array<{ text: string, isWord: boolean, offset: number }> = [];
             const regex = /([a-zA-Z'-]+)|([^a-zA-Z'-]+)/g;
             let match;
+            let localOffset = 0;
 
-            while ((match = regex.exec(partText)) !== null) {
-                const [_, word, nonWord] = match;
+            while ((match = regex.exec(segmentText)) !== null) {
+                const [fullMatch, word, nonWord] = match;
                 if (word) {
-                    tokens.push({ text: word, isWord: true });
+                    tokens.push({ text: word, isWord: true, offset: segmentStartOffset + localOffset });
                 } else if (nonWord) {
-                    tokens.push({ text: nonWord, isWord: false });
+                    tokens.push({ text: nonWord, isWord: false, offset: segmentStartOffset + localOffset });
                 }
+                localOffset += fullMatch.length;
             }
 
             return tokens.map((token, idx) => {
@@ -278,15 +273,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                         <span
                             key={idx}
                             data-word-clickable="true"
-                            onClick={(e) => handleWordClick(token.text, e, paragraphIndex)}
-                            className={`cursor-pointer rounded px-0.5 transition-colors inline-block ${isPartHighlighted ? 'hover:bg-yellow-300' : 'hover:bg-[#00B4EE]/10'
+                            onClick={(e) => handleWordClick(token.text, e, paragraphIndex, token.offset)}
+                            className={`cursor-pointer rounded px-0.5 transition-colors inline-block ${isSegmentHighlighted ? 'hover:bg-yellow-300' : 'hover:bg-[#00B4EE]/10'
                                 }`}
-                            // If the part is highlighted, the parent span handles the background, 
-                            // but we can add specific styles if needed.
-                            // Actually, for the student view, we might want the yellow background on the words themselves
-                            // or on the container. Let's put it on the container for the "sentence highlight" feel,
-                            // but we need to ensure the words are still clickable.
-                            title={isPartHighlighted ? '已高亮 - 点击操作' : '点击查词或高亮'}
+                            title={isSegmentHighlighted ? '已高亮 - 点击操作' : '点击查词或高亮'}
                         >
                             {token.text}
                         </span>
@@ -299,12 +289,12 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
         return (
             <p data-paragraph-index={paragraphIndex} className="mb-8 text-lg leading-loose text-slate-700 font-serif">
-                {parts.map((part, i) => (
+                {segments.map((segment, i) => (
                     <span
                         key={i}
-                        className={part.isHighlight ? "bg-yellow-200 rounded px-0.5 transition-colors" : ""}
+                        className={segment.isHighlight ? "bg-yellow-200 rounded px-0.5 transition-colors" : ""}
                     >
-                        {renderTokens(part.text, part.isHighlight)}
+                        {renderTokens(segment.text, segment.isHighlight, segment.startOffset)}
                     </span>
                 ))}
             </p>
@@ -316,12 +306,11 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
             {/* 点击单词后的浮动工具栏 */}
             <AnimatePresence>
                 {clickedWord && (() => {
-                    // Check if the clicked word is part of any existing highlight in the SAME paragraph
+                    // Check if the clicked word has an existing highlight at the exact position
                     const existingHighlight = highlights.find(h =>
-                        h.paragraphIndex === clickedWord.paragraphIndex && (
-                            h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
-                            clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
-                        )
+                        h.paragraphIndex === clickedWord.paragraphIndex &&
+                        h.startOffset === clickedWord.startOffset &&
+                        h.text.length === clickedWord.word.length
                     );
 
                     const isHighlighted = !!existingHighlight;
@@ -340,17 +329,10 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (isHighlighted) {
-                                        // Find ALL matching highlights in the same paragraph to ensure visual removal
-                                        const matchingHighlights = highlights.filter(h =>
-                                            h.paragraphIndex === clickedWord.paragraphIndex && (
-                                                h.text.toLowerCase().includes(clickedWord.word.toLowerCase()) ||
-                                                clickedWord.word.toLowerCase().includes(h.text.toLowerCase())
-                                            )
-                                        );
-                                        matchingHighlights.forEach(h => removeHighlight(h.id));
+                                    if (isHighlighted && existingHighlight) {
+                                        removeHighlight(existingHighlight.id);
                                     } else {
-                                        addHighlight(clickedWord.word, clickedWord.paragraphIndex);
+                                        addHighlight(clickedWord.word, clickedWord.paragraphIndex, clickedWord.startOffset);
                                     }
                                     setClickedWord(null);
                                 }}
@@ -387,13 +369,13 @@ export const StudentBattleView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedd
 
             <AnimatePresence>
                 {selectionRect && selectedLocation && (() => {
-                    // Check if selected text is part of any existing highlight in the same paragraph
-                    const isHighlighted = selectedText && highlights.some(h =>
-                        h.paragraphIndex === selectedLocation.paragraphIndex && (
-                            h.text.toLowerCase().includes(selectedText.toLowerCase()) ||
-                            selectedText.toLowerCase().includes(h.text.toLowerCase())
-                        )
+                    // Check if there's an existing highlight at the exact position
+                    const existingHighlight = highlights.find(h =>
+                        h.paragraphIndex === selectedLocation.paragraphIndex &&
+                        h.startOffset === selectedLocation.startOffset &&
+                        h.text.length === selectedText.length
                     );
+                    const isHighlighted = !!existingHighlight;
                     return (
                         <motion.div
                             initial={{ opacity: 0, y: 10, scale: 0.9 }}
