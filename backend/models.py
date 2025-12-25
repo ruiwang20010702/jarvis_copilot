@@ -46,9 +46,9 @@ class Version(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     article = relationship("Article", back_populates="versions")
-    questions = relationship("Question", back_populates="version")
-    sentence_surgeries = relationship("SentenceSurgery", back_populates="version")
-    vocab_cards = relationship("VocabCard", back_populates="version")
+    questions = relationship("Question", back_populates="version", order_by="Question.id")
+    sentence_surgeries = relationship("SentenceSurgery", back_populates="version", order_by="SentenceSurgery.id")
+    vocab_cards = relationship("VocabCard", back_populates="version", order_by="VocabCard.id")
 
 class Question(Base):
     __tablename__ = "questions"

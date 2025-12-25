@@ -217,7 +217,7 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                         <div className="flex flex-col items-center">
                             {/* 磁性句子区域 */}
                             <LayoutGroup>
-                                <motion.div layout className="flex flex-wrap justify-center items-center gap-x-4 gap-y-8">
+                                <motion.div layout className="flex flex-wrap justify-center items-center gap-x-2 gap-y-8">
                                     <AnimatePresence mode="popLayout">
                                         {surgeryChunks.filter(c => !c.isRemoved).map((chunk) => (
                                             <motion.div
@@ -241,8 +241,8 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                 }}
                                                 onClick={() => handleChunkClick(chunk)}
                                                 className={`
-                                                    relative px-3 py-2 rounded-xl transition-all duration-200
-                                                    ${dynamicFontSize} font-serif font-bold tracking-tight
+                                                    relative px-1.5 py-2 rounded-xl transition-all duration-200
+                                                    ${dynamicFontSize} font-serif font-bold
                                                     ${isInteractive
                                                         ? 'cursor-pointer pointer-events-auto'
                                                         : 'cursor-default pointer-events-none'
@@ -256,6 +256,7 @@ export const StudentSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbed
                                                     }
                                                     ${chunk.shake ? '!text-red-500' : ''}
                                                 `}
+                                                style={{ wordSpacing: '0.2em' }}
                                             >
                                                 {/* 成分标签浮动显示 - 学生实操模式下不显示（不能给答案） */}
                                                 {showSurgeryStructure && surgeryMode !== 'student' && (

@@ -567,10 +567,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let surgeryChunks = INITIAL_SURGERY_CHUNKS;
 
       if (apiVersion.sentence_surgeries && apiVersion.sentence_surgeries.length > 0) {
-        // TODO: 测试阶段只取第一句长难句
-        surgeryList = apiVersion.sentence_surgeries.slice(0, 1).map(s => transformSentenceSurgery(s));
-        surgeryChunks = surgeryList[0].chunks;
-        console.log('[Store] Loaded surgery list:', surgeryList.length, 'sentences (limited to 1 for testing)');
+        // 仅展示包含 "Wei and Zhang" 的那一句
+        surgeryList = apiVersion.sentence_surgeries
+          .filter(s => s.original_sentence.includes("Wei and Zhang"))
+          .map(s => transformSentenceSurgery(s));
+
+        if (surgeryList.length > 0) {
+          surgeryChunks = surgeryList[0].chunks;
+        }
+        console.log('[Store] Filtered surgery list to specific sentence');
       }
 
       set({

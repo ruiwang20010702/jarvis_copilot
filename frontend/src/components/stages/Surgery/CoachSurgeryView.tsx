@@ -490,7 +490,7 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                             </div>
                         ) : (
                             <LayoutGroup id="coach-sentence">
-                                <motion.div layout className="flex flex-wrap justify-center items-center gap-x-6 gap-y-8">
+                                <motion.div layout className="flex flex-wrap justify-center items-center gap-x-2 gap-y-8">
                                     <AnimatePresence mode="popLayout">
                                         {surgeryChunks.filter(c => !c.isRemoved).map(c => (
                                             <motion.div
@@ -500,7 +500,7 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ y: -30, opacity: 0, scale: 0.7, transition: { duration: 0.3 } }}
                                                 onClick={() => handleChunkClick(c)}
-                                                className={`relative text-4xl md:text-5xl font-serif font-bold px-4 py-2 rounded-2xl transition-all ${c.type === 'modifier' && isTeacherInteractive
+                                                className={`relative text-4xl md:text-5xl font-serif font-bold px-1.5 py-2 rounded-2xl transition-all ${c.type === 'modifier' && isTeacherInteractive
                                                     ? 'cursor-pointer hover:bg-blue-50 hover:shadow-md active:scale-95'
                                                     : ''
                                                     } ${showSurgeryStructure
@@ -509,6 +509,7 @@ export const CoachSurgeryView: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedde
                                                             : 'bg-amber-100 text-amber-800 border-2 border-amber-400')
                                                         : 'text-[#1E293B]'
                                                     }`}
+                                                style={{ wordSpacing: '0.2em' }}
                                             >
                                                 {/* 成分标签浮动显示 */}
                                                 {showSurgeryStructure && (
