@@ -1,6 +1,8 @@
 {
+    "$schema": "https://schema.zeabur.app/template.json",
     "build": {
-        "command": null
+        "type": "dockerfile",
+        "dockerfile": "Dockerfile"
     },
     "start": {
         "command": "uvicorn main:app --host 0.0.0.0 --port $PORT"

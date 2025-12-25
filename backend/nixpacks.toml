@@ -3,4 +3,9 @@
 
 [phases.setup]
 # 安装 ffmpeg，用于音频格式转换（发音评分功能需要）
-nixPkgs = ["ffmpeg"]
+nixPkgs = ["ffmpeg-full"]
+aptPkgs = ["ffmpeg"]
+
+[phases.build]
+# 确保构建阶段也能访问 ffmpeg
+dependsOn = ["setup"]
