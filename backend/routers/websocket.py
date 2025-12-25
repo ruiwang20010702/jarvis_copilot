@@ -35,12 +35,28 @@ class ConnectionManager:
                 "timestamp": asyncio.get_event_loop().time()
             })
 
-    def disconnect(self, client_id: str):
+    async def disconnect(self, client_id: str):
+        # 检查断开连接的是否是学生
+        role = self.client_roles.get(client_id)
+        is_student = role == 'student'
+        
         if client_id in self.active_connections:
             del self.active_connections[client_id]
         if client_id in self.client_roles:
             del self.client_roles[client_id]
-        print(f"❌ Client disconnected: {client_id}")
+        print(f"❌ Client disconnected: {client_id} (role: {role})")
+        
+        # 如果学生退出，清空房间状态并通知其他客户端
+        if is_student:
+            print(f"🧹 Student left - clearing room state")
+            self.room_state = {}
+            await self.broadcast({
+                "type": "ROOM_RESET",
+                "senderId": client_id,
+                "senderRole": "student",
+                "reason": "student_left",
+                "timestamp": asyncio.get_event_loop().time()
+            })
 
     async def broadcast(self, message: dict, sender_id: str = None):
         for client_id, connection in self.active_connections.items():
@@ -129,7 +145,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
             await manager.handle_message(client_id, data)
     except WebSocketDisconnect:
-        manager.disconnect(client_id)
+        await manager.disconnect(client_id)
     except Exception as e:
         print(f"WebSocket error: {e}")
-        manager.disconnect(client_id)
+        await manager.disconnect(client_id)
